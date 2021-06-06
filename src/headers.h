@@ -70,7 +70,8 @@ struct process
 	 remainingtime, 
 	 startingTime,
 	 stopped_time,
-	 resume_time;
+	 resume_time,
+     process_id;
 };
 //
 struct PCB 
@@ -160,6 +161,11 @@ void dequeue(Queue *myqueue)
 			(myqueue->length)--;
 		}
 	}
+
+bool isEmpty(Queue *q)
+    {
+        return (q->length ==0); 
+    }
 // ------------------------------------------------------------------priority queue-----------------------------------
 struct item {
  struct process myProcess;
