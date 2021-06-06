@@ -1,11 +1,13 @@
 #include "headers.h"
 
-void clearResources(int);
-
-struct process
+///  buffer struct for process generator to scheduler queue 
+struct buff_GenSch
 {
-    int id, arrival_time, runtime, priority;
+    int mtype;
+    struct process NewProcess; // process that will be sent from process generator to scheduler
+   
 };
+void clearResources(int);
 
 typedef struct process process;
 
@@ -17,7 +19,7 @@ int main(int argc, char *argv[])
     FILE *inputFile;
     char *buffer = NULL;
     size_t bufsize = 0;
-    int processesNum = 0, index = 0, schedulingAlgorithm, algorithmParameter = -1;
+    int index = 0;
 
     // 1. Read the input files.
     inputFile = fopen(argv[1], "r");
@@ -41,7 +43,7 @@ int main(int argc, char *argv[])
     // 2. Read the chosen scheduling algorithm and its parameters, if there are any from the argument list.
     schedulingAlgorithm = atoi(argv[1]);
     if (schedulingAlgorithm == 5)
-        algorithmParameter = atoi(argv[2]);
+        quantum = atoi(argv[2]);
 
     // 3. Initiate and create the scheduler and clock processes.
     int clk_processId = fork();
@@ -64,6 +66,35 @@ int main(int argc, char *argv[])
         system("./scheduler.out");
         exit(0);
     }
+    //  start sending the ready processes to the scheduler
+        key_t key1 ;
+        key1= ftok("genrator_to_sch", 65); 
+        int sen_val;
+        msgq_id_GenSch = msgget(key1, 0666 | IPC_CREAT);
+        if (  msgq_id_GenSch  == -1)
+            {
+                perror("Error in create up queue");
+                exit(-1);
+            }
+        // loop untill all the processes in the file sent to scheduler
+             int i =0;
+           while ( processesNum_sent_toSCH < processesNum)
+        {
+            if( processes[i].arrival_time == getClk() )
+            {
+                struct buff_GenSch process_msg;
+                process_msg.NewProcess= processes[i];
+                sen_val = msgsnd(msgq_id_GenSch, &process_msg, sizeof(process_msg.NewProcess), !IPC_NOWAIT);
+                processesNum_sent_toSCH ++;
+            }
+            // we may reach end of the array but still there are some processes not sent to scheduler yet
+            if( i == processesNum)
+              i=0;
+             else
+             i++;
+           
+        }
+    
     // 4. Use this function after creating the clock process to initialize clock.
     initClk();
     // To get time use this function.
