@@ -63,14 +63,6 @@ int main(int agrc, char *argv[])
     
     }
 
-    // When the process is about to finish it should send the time taken to finish to the scheduler
-    int timeTaken = getClk() - startingTime;
-    struct processSchedulermsgbuff message;
-    message.mtype = pid;
-    message.timeTaken = timeTaken;
-    int sendValue = msgsnd(msgq_id_PrcSch, &message, sizeof(message.timeTaken), !IPC_NOWAIT);
-    if (sendValue = -1)
-        perror("Error in sending taken time from process: " + pid);
-    destroyClk(false);
+    /// bye
     return 0;
 }

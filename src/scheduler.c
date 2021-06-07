@@ -1,6 +1,6 @@
 #include "headers.h"
 #include <string.h>
-
+#include <stdio.h>
 
 //////////////////// -------------------  General buffers -----------------------------
 
@@ -33,7 +33,8 @@ struct PCB
 	remainingtime, 
 	startingTime,
 	stopped_time,
-	resume_time;   
+	resume_time,
+    waiting_time;
     enum STATE state;
 
 };
@@ -52,13 +53,14 @@ int Ready_NUm_processes=0;
 int DS_Queue=1;
 int DS_PrioirtyQ=2;
 int myUsedDS;
-   
+FILE *pFile;
 ///----------------------------------------------- MAIN --------------------------------------------------------
 int main(int argc, char *argv[])
 {
     initClk();
     PCB_LIST = (PCB *)malloc(processesNum* sizeof(PCB));
-
+    pFile = fopen("Scheduler.log", "w");
+    //fclose(pFile); // close the file emta msh 3arfa rabna ysahl
 
 ///----------------------------------- Message queues initializations------------------------
 
@@ -167,7 +169,22 @@ void resumeProcess(int id){
 
 }
 
-
+void finshed_processes()
+{
+     for ( int i=0; i < processesNum ; i++)
+         {
+             if ( PCB_LIST[i].remainingtime == 0 )
+             {
+                 // finsh getclk
+                // PCB_LIST[i].waiting_time= arr - finish - run
+                // TA = arr - finish
+                  fprintf(pFile, "At time %d\t process %d\t finished arr %d\t total %d\t remain %d\t wait\n",
+                  getClk(),PCB_LIST[i].id , PCB_LIST[i].arrival_time, PCB_LIST[i].runtime,
+                   0 ,0 );
+                   /// free pcb
+             }
+         }
+}
 
 void FCFS() {}
 
@@ -189,6 +206,8 @@ void HPF ()
     //loop till the queue is empty
      while( Ready_NUm_processes > 0 ||  HPF_Queue_size ==-1   ) // or first time
      {
+        // check if thers is a prcoess that finished
+        finshed_processes();
 
         rec_val = msgrcv(msgq_id_GenSch, &process_msg, sizeof( process_msg.NewProcess),0, !IPC_NOWAIT); 
             if (rec_val == -1)
@@ -200,7 +219,8 @@ void HPF ()
             {
                 // add the new recieved process to the priority queue
                 enqueue_priority( process_msg.NewProcess ,  process_msg.NewProcess.priority);
-                PCB_LIST[process_msg.NewProcess.id]. = process_msg.NewProcess ;
+                PCB_LIST[process_msg.NewProcess.id].arrival_time = process_msg.NewProcess.arrival_time ;
+                 PCB_LIST[process_msg.NewProcess.id].runtime=process_msg.NewProcess.runtime;
                 Ready_NUm_processes++;
             }
 
@@ -218,19 +238,33 @@ void HPF ()
             {
                 // inform process file to stop the process
                 //PCB change
-                PCB_LIST[message.running_process.id].arrival_time ;
-                 stopProcess(HPF_Queue[current_turn].myProcess.process_id);
+                // remain = total run - time stopped - started
+                  PCB_LIST[message.running_process.id].remainingtime =  message.running_process.runtime- getClk() -PCB_LIST[message.running_process.id].startingTime;
+                  PCB_LIST[message.running_process.id].stopped_time=getClk();
+                //  PCB_LIST[message.running_process.id]. =  message.running_process.runtime- getClk() -PCB_LIST[message.running_process.id].startingTime;
 
+                fprintf(pFile, "At time %d\t process %d\t stopped arr %d\t total %d\t remain %d\t wait\n",
+                  getClk(), message.running_process.id, message.running_process.arrival_time, message.running_process.runtime,
+                   PCB_LIST[message.running_process.id].remainingtime ,0 );
+
+                 stopProcess(HPF_Queue[current_turn].myProcess.process_id);
+                    
                 // stop the current process + save its context switch + start runnig the process with highest priority
                 enqueue_priority( message.running_process ,  message.running_process.priority);
                 Ready_NUm_processes ++;
             }
             
-          // if it was stopped we should make it resume working
+          //if process with the next turn is waiting in the ready queue:
             if (PCB_LIST[HPF_Queue[current_turn].myProcess.id].state == waiting )
             {
-               resumeProcess(HPF_Queue[current_turn].myProcess.process_id);
-               // print resumed at ...
+               resumeProcess(HPF_Queue[current_turn].myProcess.id);
+
+         PCB_LIST[HPF_Queue[current_turn].myProcess.id].waiting_time=  getClk() -PCB_LIST[message.running_process.id].stopped_time;
+                
+                fprintf(pFile, "At time %d\t process %d\t resumed arr %d\t total %d\t remain %d\t wait\n",
+                  getClk(), HPF_Queue[current_turn].myProcess.id , message.running_process.arrival_time, message.running_process.runtime,
+                  PCB_LIST[HPF_Queue[current_turn].myProcess.id].remainingtime ,PCB_LIST[HPF_Queue[current_turn].myProcess.id].waiting_time);
+               //TODO: send remaining time to prcosess
 
                 sen_val = msgsnd(msgq_id_PrcSch, &message,sizeof(message), !IPC_NOWAIT);
                 if (sen_val == -1)
@@ -240,9 +274,16 @@ void HPF ()
                     }
 
             } 
+            // first time to run 
             else
             {
                  message.running_process = HPF_Queue[current_turn].myProcess;
+                 PCB_LIST[message.running_process.id].startingTime =getClk();
+                 PCB_LIST[message.running_process.id].remainingtime=message.running_process.runtime;
+
+                 fprintf(pFile, "At time %d\t process %d\t started arr %d\t total %d\t remain %d\t wait %d\n",
+                  getClk(), message.running_process.id,message.running_process.arrival_time, message.running_process.runtime, message.running_process.runtime,0 );
+             // send the process parameters to process file
                   sen_val = msgsnd(msgq_id_PrcSch, &message, sizeof(message), !IPC_NOWAIT);
                     if (sen_val == -1)
                     {
@@ -250,7 +291,7 @@ void HPF ()
                         continue;
                     
                     }
-           
+                   
                 /// run process.c
                     ProcessExecution();
             }     
