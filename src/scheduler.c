@@ -44,16 +44,20 @@ typedef struct process process;
 typedef struct PCB PCB;
 
 int  msgq_id_PrcSch ;
-Queue *Running_queue; 
-process currentProcess;
+Queue *Ready_queue; 
+process addedProcess;
 PCB * PCB_LIST;
 int Ready_NUm_processes=0;
+
+struct processSchedulermsgbuff message;
+struct buff_GenSch process_msg;
+FILE *pFile;
 
 // data structures used for algorithms 
 int DS_Queue=1;
 int DS_PrioirtyQ=2;
 int myUsedDS;
-FILE *pFile;
+
 ///----------------------------------------------- MAIN --------------------------------------------------------
 int main(int argc, char *argv[])
 {
@@ -126,48 +130,73 @@ int ProcessExecution(){
 
 // need to return boolean value after that for each call in the algorithms to check whether i recieved a process or not
 
-int checkRecievedProcess()
+void checkRecievedProcess()
 {
-    int turn=0; 
+    int added; 
 
 // from process generator 
-    struct buff_GenSch process_msg;
     rec_process = msgrcv(msgq_id_GenSch, &process_msg, sizeof( process_msg.NewProcess),0, !IPC_NOWAIT); 
     
     if (rec_process == -1){
         perror("Error in receiving process");
-        return -1;
+        return;
     } 
-    currentProcess=process_msg.NewProcess; // make my process equals to the process coming from the msg queue
 
-    turn=currentProcess.id -1; ////// remove -1 
+    addedProcess=process_msg.NewProcess; // make my process equals to the process coming from the msg queue
+
+    added=addedProcess.id; ////// remove -1 
 
     if(myUsedDS== DS_Queue){
-        enqueue(Running_queue,currentProcess);
+        enqueue(Ready_queue,addedProcess);
     }
     else if(myUsedDS=DS_PrioirtyQ){
-        enqueue_priority(currentProcess,currentProcess.priority);
+        enqueue_priority(addedProcess,addedProcess.priority);
     }
    
-    Ready_NUm_processes++;
+   PCB_LIST[added].arrival_time=addedProcess.arrival_time;
+   PCB_LIST[added].priority=addedProcess.priority;
+//    PCB_LIST[added].process_id=addedProcess.process_id;
+   PCB_LIST[added].id=addedProcess.id;
+   PCB_LIST[added].runtime=addedProcess.runtime;
 
-    return turn;
+   Ready_NUm_processes++;
+
 }
 
 
-void stopProcess(int id)
+void stopProcess(int turn)
 {
+    int id= PCB_LIST[turn].process_id;
+    PCB_LIST[turn].state=waiting;
     kill(id,SIGSTOP); //stopping it to be completed later
 
 }
 
 
-void resumeProcess(int id){
+void resumeProcess(int turn){
 
-    // msh 3arfa hena mafrod aghyar el state le running badal blocked wala la2
+    int id= PCB_LIST[turn].process_id;
+    PCB_LIST[turn].state=running;
     kill(id,SIGCONT); //continue the stopped process
 
 }
+
+int startProcess(process turnProcess){
+
+    message.running_process = turnProcess;
+
+    int sen_val = msgsnd(msgq_id_PrcSch, &message, sizeof(message), !IPC_NOWAIT);
+    if (sen_val == -1)
+    {
+        perror("error in scheduler sending new prcoess ");
+        return -1;
+    }
+           
+    /// run process.c
+   return (ProcessExecution());
+   
+}
+
 
 void finshed_processes()
 {
@@ -194,14 +223,11 @@ void HPF ()
 {
 
     myUsedDS= DS_PrioirtyQ; /// I'll use Priority queue
-
-    struct buff_GenSch process_msg;
-    struct processSchedulermsgbuff message;
+    
     int current_turn=0;
     int current_process_index=-1;
-    int rec_val;
-    int sen_val;
     int first_time=1;
+    int turn;
     // first time to recieve ????????? 
     //loop till the queue is empty
      while( Ready_NUm_processes > 0 ||  HPF_Queue_size ==-1   ) // or first time
@@ -209,32 +235,21 @@ void HPF ()
         // check if thers is a prcoess that finished
         finshed_processes();
 
-        rec_val = msgrcv(msgq_id_GenSch, &process_msg, sizeof( process_msg.NewProcess),0, !IPC_NOWAIT); 
-            if (rec_val == -1)
-            {
-                perror("Sch: No new process is ready now");
-                continue; //????????????/
-            }
-            else
-            {
-                // add the new recieved process to the priority queue
-                enqueue_priority( process_msg.NewProcess ,  process_msg.NewProcess.priority);
-                PCB_LIST[process_msg.NewProcess.id].arrival_time = process_msg.NewProcess.arrival_time ;
-                 PCB_LIST[process_msg.NewProcess.id].runtime=process_msg.NewProcess.runtime;
-                Ready_NUm_processes++;
-            }
+        checkRecievedProcess();
 
-              // no processes currently to schedule
-              if(HPF_Queue_size == -1)
-              continue;
+        // no processes currently to schedule
+        if(HPF_Queue_size == -1)
+            continue;
         
-            // get process with highest priority make it running and send it to the process  
-            current_process_index=current_turn; 
-            current_turn= peek_priority();
+        // get process with highest priority make it running and send it to the process  
+        current_process_index=current_turn; 
+        current_turn= peek_priority();
+
+    
             
-            // check if the added process has higher priority that the current running process
-            // TODO: need handle first time 
-            if ( current_process_index != current_turn ) // awl mara???
+        // check if the added process has higher priority that the current running process
+        // TODO: need handle first time 
+        if ( current_process_index != current_turn ) // awl mara???
             {
                 // inform process file to stop the process
                 //PCB change
@@ -247,7 +262,7 @@ void HPF ()
                   getClk(), message.running_process.id, message.running_process.arrival_time, message.running_process.runtime,
                    PCB_LIST[message.running_process.id].remainingtime ,0 );
 
-                 stopProcess(HPF_Queue[current_turn].myProcess.process_id);
+                stopProcess((HPF_Queue[current_turn].myProcess.id));
                     
                 // stop the current process + save its context switch + start runnig the process with highest priority
                 enqueue_priority( message.running_process ,  message.running_process.priority);
@@ -257,21 +272,14 @@ void HPF ()
           //if process with the next turn is waiting in the ready queue:
             if (PCB_LIST[HPF_Queue[current_turn].myProcess.id].state == waiting )
             {
-               resumeProcess(HPF_Queue[current_turn].myProcess.id);
+                resumeProcess((HPF_Queue[current_turn].myProcess.id));
 
-         PCB_LIST[HPF_Queue[current_turn].myProcess.id].waiting_time=  getClk() -PCB_LIST[message.running_process.id].stopped_time;
+                PCB_LIST[HPF_Queue[current_turn].myProcess.id].waiting_time=  getClk() -PCB_LIST[message.running_process.id].stopped_time;
                 
                 fprintf(pFile, "At time %d\t process %d\t resumed arr %d\t total %d\t remain %d\t wait\n",
                   getClk(), HPF_Queue[current_turn].myProcess.id , message.running_process.arrival_time, message.running_process.runtime,
                   PCB_LIST[HPF_Queue[current_turn].myProcess.id].remainingtime ,PCB_LIST[HPF_Queue[current_turn].myProcess.id].waiting_time);
                //TODO: send remaining time to prcosess
-
-                sen_val = msgsnd(msgq_id_PrcSch, &message,sizeof(message), !IPC_NOWAIT);
-                if (sen_val == -1)
-                    {
-                        perror("error in scheduler sending resumed ");
-                    
-                    }
 
             } 
             // first time to run 
@@ -284,16 +292,11 @@ void HPF ()
                  fprintf(pFile, "At time %d\t process %d\t started arr %d\t total %d\t remain %d\t wait %d\n",
                   getClk(), message.running_process.id,message.running_process.arrival_time, message.running_process.runtime, message.running_process.runtime,0 );
              // send the process parameters to process file
-                  sen_val = msgsnd(msgq_id_PrcSch, &message, sizeof(message), !IPC_NOWAIT);
-                    if (sen_val == -1)
-                    {
-                        perror("error in scheduler sending new prcoess ");
-                        continue;
-                    
-                    }
-                   
-                /// run process.c
-                    ProcessExecution();
+                int process_id=startProcess(message.running_process);
+
+                if(process_id!=-1){ //no errors occur during sending data of the process
+               //     PCB_LIST[turn].process_id=process_id;
+                }
             }     
             //// finished
             /// free pcb element
@@ -305,98 +308,62 @@ void HPF ()
       } 
     }
 
+
+
     void SRTN(){}
 
 
-    //------------------------------------------ For Round Robin -------------------------------------------
+       //------------------------------------------ For Round Robin -------------------------------------------
 
-    /*
-    >>>> Steps to be followed inshallah: 
-    1- receive the first process then start the loop.
-    2- enqueue the received process.
-    3- check the remaining time of the current process first, if it's ==0 then dequeue it. 
-    4- call the process file and send its pid within the queue.. -->> RESUME ITS WORK
-    5- perform the process for a quantum.
-    6- check if the remaining time of the current process == 0 , then dequeue it.
-    7- else stop the process to start a new one.
-    8- dequeue and enqueue it again, if condition 7 isn't performed.
-    9- receive a new process if found.
-    */
+void RR(int quantum){
 
-    void RR(int quantum){
-
-
-        myUsedDS= DS_Queue; /// I'll use queue
-
-        int startingTime=0;
-        int currentTime=0;
-        struct processSchedulermsgbuff message;
-
-        //1,2- for receiving and the enqueue of the first process 
-
-//     while(!checkRecievedProcess()){
-
-//         // do some logic here to increase the clk or smth till we receive a process
-//     }
-
-//     CurrentProcess=instantProcess; //the received process
-//     enqueue(RR_processes,CurrentProcess);
-
-//         while(!isEmpty(RR_processes)){ 
-            
-            
-//             currentTime= getClk();
-
-//             message.running_process = CurrentProcess;
-//             int sen_val = msgsnd(msgq_id_PrcSch, &message, sizeof(message.running_process), !IPC_NOWAIT);
-
-
-//             CurrentProcess.process_id= ProcessExecution();
-
-//             // NOT SURE :""""""""""""""""
-
-//             while (currentTime+quantum>getClk()){
-//                 int newClk = getClk();
-//                 if (newClk != currentTime)
-//                 currentTime++;
-//                 currentTime = newClk;
-//             }
-            
-//             if(CurrentProcess.remainingtime==0)
-//                 dequeue(RR_processes);
-
-//             else {
-//                 dequeue(RR_processes);
-//                 enqueue(RR_processes,CurrentProcess);
-//                 stopProcess(CurrentProcess);
-//             }
-
-        
-//             if(checkRecievedProcess()){
-//                 CurrentProcess=instantProcess; //the received process
-//                 enqueue(RR_processes,CurrentProcess);
-//             } 
-//    }
-
+    int currentTime;
+    int turn;
 
         // if its the first time for the algorithm or if ready processes has ended
-        while (Queue_length==-1 || Ready_NUm_processes >0){
-
-            int process_turn_id;
-
-            if(checkRecievedProcess()!=-1){ // I've received a process
-                 
-                 //PCB_LIST[]
-
-            }
-
-
-
-
+    while (Queue_length==-1 || Ready_NUm_processes >0){
             
+        // check if i received any new process then add it to my PCB
+        checkRecievedProcess(); 
+            
+        process process_turn=dequeue(Ready_queue);
+        Ready_NUm_processes--; 
+        turn=process_turn.id;
+
+        if(PCB_LIST[turn].state==waiting) { //has started before
+
+                //TODO: retrieve its data from the pcb 
+                resumeProcess(PCB_LIST[turn].process_id); 
         }
+
         
+        else { // first time     
+            int process_id=startProcess(process_turn);
 
+            if(process_id!=-1){ //no errors occur during sending data of the process
+                    PCB_LIST[turn].process_id=process_id;
+                }
+            }
+             
+        // habaaalllllll-------------------------------------
+            currentTime=getClk();
 
+        while (currentTime+quantum>getClk()){
+                int newClk = getClk();
+                if (newClk != currentTime)
+                currentTime++;
+                currentTime = newClk;
+        }
 
+        stopProcess(turn);
+
+        if(PCB_LIST[turn].remainingtime==0) //// check thissssss
+        {
+                // delete its pcb ---> create a finish function
+        }
+
+        else {
+                enqueue(Ready_queue,process_turn);
+                Ready_NUm_processes++; 
+         }
 }

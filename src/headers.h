@@ -103,7 +103,7 @@ struct Node{
 
 typedef struct Node Node;
 
-int Queue_length=0;
+int Queue_length=-1;
 
 struct Queue{
     Node *front;
@@ -116,42 +116,43 @@ typedef struct Queue Queue;
 
 void enqueue(Queue *myqueue, struct process new_process)
 	{
+        
 		Node *newnode;
 		newnode->myprocess = new_process;
-		if (Queue_length ==0)
+		if (Queue_length ==-1)
 		{
 			myqueue->front = newnode;
 			newnode->next = NULL;
 			myqueue->rear=myqueue->front;
+            Queue_length+=2;
 		}
 		else
 		{
 			newnode->next = NULL;
 			myqueue->rear->next = newnode;
 			myqueue->rear = newnode;
+            Queue_length++;
 		}
-        Queue_length++;
+        
 	}
 
-void dequeue(Queue *myqueue)
+process dequeue(Queue *myqueue)
 	{
-		if (Queue_length==0)
-		{
-			return;
-		}
-		else
-		{
-			Node *temp = myqueue->front;
-			if (myqueue->front == myqueue->rear)
+        if(Queue_length==-1)
+            return;
+		Node *temp = myqueue->front;
+        process deleted= temp->myprocess;
+        if (myqueue->front == myqueue->rear)
 				myqueue->front = myqueue->rear = NULL;
-			else
+		else
 			{
 				myqueue->front = myqueue->front->next;
 				temp->next = NULL;
 				free(temp);
 			}
 			Queue_length--;
-		}
+
+        return deleted;
 	}
 
 // bool isEmpty(Queue *q)
