@@ -101,14 +101,16 @@ struct Node{
 	struct Node *next;
 };
 
+typedef struct Node Node;
+
+int Queue_length=-1;
 
 struct Queue{
     Node *front;
-    Node *rear; 
-    int length; 
+    Node *rear;  
 };
 
-typedef struct Node Node;
+
 typedef struct Queue Queue;
 
 
@@ -116,25 +118,24 @@ void enqueue(Queue *myqueue, struct process new_process)
 	{
 		Node *newnode;
 		newnode->myprocess = new_process;
-		if ((myqueue->length) ==0)
+		if (Queue_length ==0)
 		{
 			myqueue->front = newnode;
 			newnode->next = NULL;
 			myqueue->rear=myqueue->front;
-			(myqueue->length)++;
 		}
 		else
 		{
 			newnode->next = NULL;
 			myqueue->rear->next = newnode;
 			myqueue->rear = newnode;
-			myqueue->length++;
 		}
+        Queue_length++;
 	}
 
 void dequeue(Queue *myqueue)
 	{
-		if ((myqueue->length) ==0)
+		if (Queue_length==0)
 		{
 			return;
 		}
@@ -149,14 +150,14 @@ void dequeue(Queue *myqueue)
 				temp->next = NULL;
 				free(temp);
 			}
-			(myqueue->length)--;
+			Queue_length--;
 		}
 	}
 
-bool isEmpty(Queue *q)
-    {
-        return (q->length ==0); 
-    }
+// bool isEmpty(Queue *q)
+//     {
+//         return (q->length ==0); 
+//     }
 // ------------------------------------------------------------------priority queue-----------------------------------
 struct item {
  struct process myProcess;

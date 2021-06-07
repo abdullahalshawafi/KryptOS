@@ -1,5 +1,9 @@
 #include "headers.h"
 #include <string.h>
+
+
+//////////////////// -------------------  General buffers -----------------------------
+
 ///  buffer struct for process generator to scheduler queue 
 struct buff_GenSch
 {
@@ -7,6 +11,7 @@ struct buff_GenSch
     struct process NewProcess; // process that will be sent from process generator to scheduler
    
 };
+
 ///  buffer struct for process file to scheduler queue 
 struct processSchedulermsgbuff
 {
@@ -14,39 +19,50 @@ struct processSchedulermsgbuff
     int timeTaken;
     struct process running_process;
 };
+
+
+//////////////////  -------------------- PCB---------------------------------------
 struct PCB 
 {
 
     int id, //this id read from the input file
     process_id, // this the actual id in the system 
-	 arrival_time, 
-	 runtime, 
-	 priority,
-	 remainingtime, 
-	 startingTime,
-	 stopped_time,
-	 resume_time;   
-      enum STATE state;
-
+	arrival_time, 
+	runtime, 
+	priority,
+	remainingtime, 
+	startingTime,
+	stopped_time,
+	resume_time;   
+    enum STATE state;
 
 };
-//---------------------------------------------------------------------------global  declerations -------------------------------------
+
+//--------------------------------------global declerations -------------------------------------
 typedef struct process process;
 typedef struct PCB PCB;
-  int processesNum_schHas =0;
-  int index=0; 
-  int  msgq_id_PrcSch ;
-  Queue *RR_processes; 
-  process instantProcess;
-   PCB * PCB_LIST ;
-   int Ready_NUm_processes=0;
+
+int  msgq_id_PrcSch ;
+Queue *Running_queue; 
+process currentProcess;
+PCB * PCB_LIST;
+int Ready_NUm_processes=0;
+
+// data structures used for algorithms 
+int DS_Queue=1;
+int DS_PrioirtyQ=2;
+int myUsedDS;
    
 ///----------------------------------------------- MAIN --------------------------------------------------------
 int main(int argc, char *argv[])
 {
     initClk();
     PCB_LIST = (PCB *)malloc(processesNum* sizeof(PCB));
-//  mdq queue to talk to process generator
+
+
+///----------------------------------- Message queues initializations------------------------
+
+//  msq queue to talk to process generator
         key_t key1 ;
         key1= ftok("genrator_to_sch", 65); 
         
@@ -56,7 +72,8 @@ int main(int argc, char *argv[])
                 perror("Error in create up queue");
                 exit(-1);
             }
-      //  mdq queue to talk to process file
+
+      //  msq queue to talk to process file
         key_t key2 ;
         key2 = ftok("processto_sch", 66); 
         msgq_id_PrcSch = msgget(key2, 0666 | IPC_CREAT);
@@ -66,22 +83,6 @@ int main(int argc, char *argv[])
                 exit(-1);
             }
       
-
-/// we will save all ready recived processes in this array
-       
-    // process * ReadyProcesses = (process *)malloc(processesNum * sizeof(process));
-
-
- 
-// still not sure but at least we know it will be working till the process generator stop sending processes to it
-// but we didn't cover the process side yet ???
-          //  while( processesNum_sent_toSCH < processesNum)
-            //{
-             
-            // if we received a process add it to the array 
-
-             // ReadyProcesses[index] = newPuff.NewProcess;  ///// uncomment meeeee
-          
             switch (schedulingAlgorithm)
             {
                 case 1: FCFS();
@@ -95,12 +96,9 @@ int main(int argc, char *argv[])
                 case 5: RR(quantum);
                     break;    
             }
-       // }
       
-
     
 
-    //TODO: implement the scheduler.
     //TODO: upon termination release the clock resources.
 
     destroyClk(true);
@@ -116,10 +114,7 @@ int ProcessExecution(){
 
     else if (pid == 0) // running process 
         {
-            if(instantProcess.remainingtime>0 && instantProcess.startingTime>0)
-                resumeProcess(instantProcess);
-            else     
-                system("./process.out");
+            system("./process.out");
             exit(-1);
         }
 
@@ -129,8 +124,9 @@ int ProcessExecution(){
 
 // need to return boolean value after that for each call in the algorithms to check whether i recieved a process or not
 
-bool checkRecievedProcess()
+int checkRecievedProcess()
 {
+    int turn=0; 
 
 // from process generator 
     struct buff_GenSch process_msg;
@@ -138,10 +134,22 @@ bool checkRecievedProcess()
     
     if (rec_process == -1){
         perror("Error in receiving process");
-        return false;
+        return -1;
+    } 
+    currentProcess=process_msg.NewProcess; // make my process equals to the process coming from the msg queue
+
+    turn=currentProcess.id -1; ////// remove -1 
+
+    if(myUsedDS== DS_Queue){
+        enqueue(Running_queue,currentProcess);
     }
-    instantProcess=process_msg.NewProcess; // make my process equals to the process coming from the msg queue
-    return true;
+    else if(myUsedDS=DS_PrioirtyQ){
+        enqueue_priority(currentProcess,currentProcess.priority);
+    }
+   
+    Ready_NUm_processes++;
+
+    return turn;
 }
 
 
@@ -168,6 +176,8 @@ void SJF(){}
 void HPF ()
 {
 
+    myUsedDS= DS_PrioirtyQ; /// I'll use Priority queue
+
     struct buff_GenSch process_msg;
     struct processSchedulermsgbuff message;
     int current_turn=0;
@@ -190,7 +200,6 @@ void HPF ()
             {
                 // add the new recieved process to the priority queue
                 enqueue_priority( process_msg.NewProcess ,  process_msg.NewProcess.priority);
-                Ready_NUm_processes  ++;
                 PCB_LIST[process_msg.NewProcess.id]. = process_msg.NewProcess ;
                 Ready_NUm_processes++;
             }
@@ -275,56 +284,77 @@ void HPF ()
 
     void RR(int quantum){
 
-        process CurrentProcess;
+
+        myUsedDS= DS_Queue; /// I'll use queue
+
         int startingTime=0;
         int currentTime=0;
         struct processSchedulermsgbuff message;
 
         //1,2- for receiving and the enqueue of the first process 
 
-    while(!checkRecievedProcess()){
+//     while(!checkRecievedProcess()){
 
-        // do some logic here to increase the clk or smth till we receive a process
-    }
+//         // do some logic here to increase the clk or smth till we receive a process
+//     }
 
-    CurrentProcess=instantProcess; //the received process
-    enqueue(RR_processes,CurrentProcess);
+//     CurrentProcess=instantProcess; //the received process
+//     enqueue(RR_processes,CurrentProcess);
 
-        while(!isEmpty(RR_processes)){ 
+//         while(!isEmpty(RR_processes)){ 
             
             
-            currentTime= getClk();
+//             currentTime= getClk();
 
-            message.running_process = CurrentProcess;
-            int sen_val = msgsnd(msgq_id_PrcSch, &message, sizeof(message.running_process), !IPC_NOWAIT);
+//             message.running_process = CurrentProcess;
+//             int sen_val = msgsnd(msgq_id_PrcSch, &message, sizeof(message.running_process), !IPC_NOWAIT);
 
 
-            CurrentProcess.process_id= ProcessExecution();
+//             CurrentProcess.process_id= ProcessExecution();
 
-            // NOT SURE :""""""""""""""""
+//             // NOT SURE :""""""""""""""""
 
-            while (currentTime+quantum>getClk()){
-                int newClk = getClk();
-                if (newClk != currentTime)
-                currentTime++;
-                currentTime = newClk;
-            }
+//             while (currentTime+quantum>getClk()){
+//                 int newClk = getClk();
+//                 if (newClk != currentTime)
+//                 currentTime++;
+//                 currentTime = newClk;
+//             }
             
-            if(CurrentProcess.remainingtime==0)
-                dequeue(RR_processes);
+//             if(CurrentProcess.remainingtime==0)
+//                 dequeue(RR_processes);
 
-            else {
-                dequeue(RR_processes);
-                enqueue(RR_processes,CurrentProcess);
-                stopProcess(CurrentProcess);
-            }
+//             else {
+//                 dequeue(RR_processes);
+//                 enqueue(RR_processes,CurrentProcess);
+//                 stopProcess(CurrentProcess);
+//             }
 
         
-            if(checkRecievedProcess()){
-                CurrentProcess=instantProcess; //the received process
-                enqueue(RR_processes,CurrentProcess);
-            } 
-   }
+//             if(checkRecievedProcess()){
+//                 CurrentProcess=instantProcess; //the received process
+//                 enqueue(RR_processes,CurrentProcess);
+//             } 
+//    }
+
+
+        // if its the first time for the algorithm or if ready processes has ended
+        while (Queue_length==-1 || Ready_NUm_processes >0){
+
+            int process_turn_id;
+
+            if(checkRecievedProcess()!=-1){ // I've received a process
+                 
+                 //PCB_LIST[]
+
+            }
+
+
+
+
+            
+        }
+        
 
 
 
