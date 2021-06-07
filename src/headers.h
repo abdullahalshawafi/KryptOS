@@ -60,56 +60,47 @@ void destroyClk(bool terminateAll)
         killpg(getpgrp(), SIGINT);
     }
 }
+// Each process have a state of only two state running or blocked
+enum STATE
+{
+   running, waiting
+};
 // struct for process contains its parameters
 struct process
 {
-    int id,
+    int id, //this id read from the input file
+    process_id, // this the actual id in the system 
 	 arrival_time, 
 	 runtime, 
-	 priority,
-	 remainingtime, 
-	 startingTime,
-	 stopped_time,
-	 resume_time,
-     process_id;
+	 priority;
 };
-//
-struct PCB 
-{
 
-
-};
 // ----------------------------------- general variables declerations ---------------------------------------
 int schedulingAlgorithm, quantum = -1;
 int msgq_id_GenSch;
 int rec_process;
 int processesNum = 0; // no.of el processes we read from the input file
 //int Current_processesNum = 0; // no.of el processes remaining (not finished)
-int processesNum_sent_toSCH=0; //no.of el processes sent to el scheduler
+int processesNum_sent_toSCH=0; //no.of el processes sent to el scheduler (to stop process generator loop)
+
 
 // dol msh 3arfa les hyt7sbo fen w ezay but we need them
 int actual_processing_time ;// total of all the processes to compute CPU utilization
 int totalelapsedtime;
 
-  struct process *Blocked_Processes = 0; // vector decleration
-  struct PCB * ContextSwitch_Vector =0; // USELESS?!!
+  
+ 
+  
+  
  
   
 ////------------- DATA STRUCTURES USED IN SCHEDULING ALGORITHMS --------------------------------------------//////////////////////
-
-
-
-///// ---------------- Normal queue --------------------
+///// ---------------- --------------Normal queue --------------------
 struct Node{
 	struct process myprocess;
 	struct Node *next;
 };
-// Each process have a state of only two state running or blocked
-enum STATE
-{
-    RUNNING,
-    BLOCKED
-};
+
 
 struct Queue{
     Node *front;
@@ -176,18 +167,18 @@ struct item {
 struct  item HPF_Queue[100000];
   
 // Pointer to the last index
-int size = -1;
+int HPF_Queue_size = -1;
   
 // Function to insert a new element
 // into priority queue
 void enqueue_priority(struct process process, int priority)
 {
     // Increase the size
-    size++;
+    HPF_Queue_size++;
   
     // Insert the element
-    HPF_Queue[size].myProcess = process;
-   HPF_Queue[size].priority = priority;
+    HPF_Queue[HPF_Queue_size].myProcess = process;
+   HPF_Queue[HPF_Queue_size].priority = priority;
 }
   
 // Function to return index with highest priority
@@ -199,7 +190,7 @@ int peek_priority()
   
     // Check for the element with
     // highest priority
-    for (int i = 0; i <= size; i++) {
+    for (int i = 0; i <= HPF_Queue_size; i++) {
   
         // If priority is same choose
         // the element with the
@@ -231,11 +222,11 @@ void dequeue_priority()
     // Shift the element one index before
     // from the postion of the element
     // with highest priortity is found
-    for (int i = ind; i < size; i++) {
+    for (int i = ind; i < HPF_Queue_size; i++) {
         HPF_Queue[i] = HPF_Queue[i + 1];
     }
      // Decrease the size of the
     // priority queue by one
-    size--;
+    HPF_Queue_size--;
 }
 	
