@@ -103,7 +103,7 @@ struct Node{
 
 typedef struct Node Node;
 
-int Queue_length=-1;
+int Queue_length=0;
 
 struct Queue{
     Node *front;
