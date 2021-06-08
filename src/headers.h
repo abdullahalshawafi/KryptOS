@@ -62,25 +62,20 @@ void destroyClk(bool terminateAll)
         killpg(getpgrp(), SIGINT);
     }
 }
-
-// Each process has only one of two states running or blocked
+// Each process have a state of only two state running or blocked
 enum STATE
 {
-    RUNNING,
-    BLOCKED
+    running,
+    waiting
 };
-
 // struct for process contains its parameters
 struct Process
 {
-    int id,
+    int id,         //this id read from the input file
+        process_id, // this the actual id in the system
         arrival_time,
         runtime,
-        priority,
-        remainingtime,
-        startingTime,
-        stopped_time,
-        resume_time;
+        priority;
 };
 typedef struct Process Process;
 
@@ -120,9 +115,6 @@ int processesNum_sent_toSCH = 0; //no.of the processes sent to the scheduler
 int actual_processing_time; // total of all the processes to compute CPU utilization
 int totalelapsedtime;
 
-struct process *Blocked_Processes = 0; // vector decleration
-struct PCB *ContextSwitch_Vector = 0;  // USELESS?!!
-
 ////------------- DATA STRUCTURES USED IN SCHEDULING ALGORITHMS -------------////
 
 ////------------- Normal Queue -------------////
@@ -133,54 +125,59 @@ struct Node
 };
 typedef struct Node Node;
 
+int Queue_length = -1;
+
 struct Queue
 {
     Node *front;
     Node *rear;
-    int length;
 };
+
 typedef struct Queue Queue;
 
 void enqueue(Queue *myqueue, Process new_process)
 {
     Node *newnode;
     newnode->myprocess = new_process;
-    if ((myqueue->length) == 0)
+    if (Queue_length == -1)
     {
         myqueue->front = newnode;
         newnode->next = NULL;
         myqueue->rear = myqueue->front;
-        (myqueue->length)++;
+        Queue_length += 2;
     }
     else
     {
         newnode->next = NULL;
         myqueue->rear->next = newnode;
         myqueue->rear = newnode;
-        myqueue->length++;
+        Queue_length++;
     }
 }
 
-void dequeue(Queue *myqueue)
+Process dequeue(Queue *myqueue)
 {
-    if ((myqueue->length) == 0)
-    {
+    if (Queue_length == -1)
         return;
-    }
+    Node *temp = myqueue->front;
+    Process deleted = temp->myprocess;
+    if (myqueue->front == myqueue->rear)
+        myqueue->front = myqueue->rear = NULL;
     else
     {
-        Node *temp = myqueue->front;
-        if (myqueue->front == myqueue->rear)
-            myqueue->front = myqueue->rear = NULL;
-        else
-        {
-            myqueue->front = myqueue->front->next;
-            temp->next = NULL;
-            free(temp);
-        }
-        (myqueue->length)--;
+        myqueue->front = myqueue->front->next;
+        temp->next = NULL;
+        free(temp);
     }
+    Queue_length--;
+
+    return deleted;
 }
+
+// bool isEmpty(Queue *q)
+//     {
+//         return (q->length ==0);
+//     }
 
 ////------------- priority Queue -------------////
 struct item
@@ -193,17 +190,17 @@ struct item
 struct item HPF_Queue[100000];
 
 // Pointer to the last index
-int size = -1;
+int HPF_Queue_size = -1;
 
 // Function to insert a new element into priority queue
 void enqueue_priority(Process process, int priority)
 {
     // Increase the size
-    size++;
+    HPF_Queue_size++;
 
     // Insert the element
-    HPF_Queue[size].myProcess = process;
-    HPF_Queue[size].priority = priority;
+    HPF_Queue[HPF_Queue_size].myProcess = process;
+    HPF_Queue[HPF_Queue_size].priority = priority;
 }
 
 // Function to return index with highest priority
@@ -213,11 +210,9 @@ int peek_priority()
     int highestPriority = 2147483648; //INT_MAX
     int ind = -1;
 
-    // Check for the element with
-    // highest priority
-    for (int i = 0; i <= size; i++)
+    // Check for the element with highest priority
+    for (int i = 0; i <= HPF_Queue_size; i++)
     {
-
         // If priority is same choose
         // the element with the
         // highest value
@@ -226,7 +221,7 @@ int peek_priority()
             highestPriority = HPF_Queue[i].priority;
             ind = i;
         }
-        else if (highestPriority > HPF_Queue[i].priority)
+        else if (highestPriority >= HPF_Queue[i].priority)
         {
             highestPriority = HPF_Queue[i].priority;
             ind = i;
@@ -247,11 +242,11 @@ void dequeue_priority()
     // Shift the element one index before
     // from the postion of the element
     // with highest priortity is found
-    for (int i = ind; i < size; i++)
+    for (int i = ind; i < HPF_Queue_size; i++)
     {
         HPF_Queue[i] = HPF_Queue[i + 1];
     }
     // Decrease the size of the
     // priority queue by one
-    size--;
+    HPF_Queue_size--;
 }

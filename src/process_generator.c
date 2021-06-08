@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
         return -1;
     }
     if (schedulingAlgorithm == 5)
-        quantum = atoi(argv[2]);
+        quantum = atoi(argv[3]);
 
     // 3. Initiate and create the scheduler and clock processes.
     int clk_processId = fork();
