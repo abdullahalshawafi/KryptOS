@@ -48,7 +48,15 @@ int main(int argc, char *argv[])
 
     else if (scheduler_processId == 0)
     {
-        system("./scheduler.out");
+        char *runCommand = (char *)malloc(21 * sizeof(char));
+        char buffer[10];
+        if (schedulingAlgorithm == 5)
+            sprintf(buffer, "%d %d %d", processesNum, schedulingAlgorithm, quantum);
+        else
+            sprintf(buffer, "%d %d", processesNum, schedulingAlgorithm);
+        strcpy(runCommand, "./scheduler.out ");
+        strcat(runCommand, buffer);
+        system(runCommand);
         exit(0);
     }
 
@@ -72,14 +80,7 @@ int main(int argc, char *argv[])
 
     // start sending the ready processes to the scheduler
 
-    key_t key1 = ftok("keyfile", msgq_genSchKey);
-    msgq_id_GenSch = msgget(key1, 0666 | IPC_CREAT);
-    if (msgq_id_GenSch == -1)
-    {
-        perror("Error in create msg queue");
-        exit(-1);
-    }
-
+    msgq_id_GenSch = initMsgq(msgq_genSchKey);
     // 6. Send the information to the scheduler at the appropriate time.
 
     int i = 0, sen_val;
@@ -87,12 +88,12 @@ int main(int argc, char *argv[])
     // loop untill all the processes in the file are sent to scheduler
     while (processesNum_sent_toSCH < processesNum)
     {
-        if (processes[i].arrival_time == getClk())
+        if (processes[processesNum_sent_toSCH].arrival_time == getClk())
         {
             Message process_msg;
-            process_msg.NewProcess = processes[i];
-            if (sen_val = msgsnd(msgq_id_GenSch, &process_msg, sizeof(process_msg.NewProcess), !IPC_NOWAIT) != 1)
-                perror("Errror in sending process to scheduler");
+            process_msg.NewProcess = processes[processesNum_sent_toSCH];
+            if (sen_val = msgsnd(msgq_id_GenSch, &process_msg, sizeof(process_msg.NewProcess), !IPC_NOWAIT) == 1)
+                perror("Error in sending process to scheduler");
             processesNum_sent_toSCH++;
         }
 
@@ -103,6 +104,7 @@ int main(int argc, char *argv[])
         //     i++;
     }
 
+    printf("Time: %d\n", getClk());
     // 7. Clear clock resources
     msgctl(msgq_id_GenSch, IPC_RMID, (struct msqid_ds *)0);
     destroyClk(true);

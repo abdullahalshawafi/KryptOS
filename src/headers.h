@@ -23,6 +23,7 @@ typedef short bool;
 int *shmaddr;
 char msgq_genSchKey = 'A';
 char msgq_prcSchKey = 'B';
+char shmKey = 'C';
 //===============================//
 
 int getClk()
@@ -45,6 +46,35 @@ void initClk()
         shmid = shmget(SHKEY, 4, 0444);
     }
     shmaddr = (int *)shmat(shmid, (void *)0, 0);
+}
+
+int initMsgq(int key)
+{
+    key_t msgqKey = ftok("keyfile", key);
+    int msgqId = msgget(msgqKey, 0666 | IPC_CREAT);
+    if (msgqId == -1)
+    {
+        perror("Error in creating the msg queue");
+        exit(-1);
+    }
+
+    return msgqId;
+}
+
+void *initShm(char key, int *id)
+{
+    key_t shmKey = ftok("keyfile", key);
+    int shmId = shmget(shmKey, 4096, 0666 | IPC_CREAT);
+    *id = shmId;
+
+    if (!~shmId)
+    {
+        perror("Error in creating of message queue");
+        exit(-1);
+    }
+
+    void *addr = shmat(shmId, (void *)0, 0);
+    return addr;
 }
 
 /*
@@ -93,7 +123,6 @@ struct processSchedulermsgbuff
 {
     long mtype;
     int timeTaken;
-    enum STATE state;
     Process running_process;
 };
 typedef struct processSchedulermsgbuff processSchedulermsgbuff;
@@ -101,7 +130,19 @@ typedef struct processSchedulermsgbuff processSchedulermsgbuff;
 //
 struct PCB
 {
+    int id,         // this id read from the input file
+        process_id, // this the actual id in the system
+        arrival_time,
+        runtime,
+        priority,
+        remainingtime,
+        startingTime,
+        stopped_time,
+        resume_time,
+        waiting_time;
+    enum STATE state;
 };
+typedef struct PCB PCB;
 
 ////------------- general variables declerations -------------////
 int schedulingAlgorithm, quantum = -1;
@@ -132,23 +173,27 @@ struct Queue
     Node *front;
     Node *rear;
 };
-
 typedef struct Queue Queue;
+
+void initialize(Queue *queue)
+{
+    queue->front = NULL;
+    queue->rear = NULL;
+}
 
 void enqueue(Queue *myqueue, Process new_process)
 {
-    Node *newnode;
+    Node *newnode = (Node *)malloc(sizeof(Node));
     newnode->myprocess = new_process;
+    newnode->next = NULL;
     if (Queue_length == -1)
     {
         myqueue->front = newnode;
-        newnode->next = NULL;
         myqueue->rear = myqueue->front;
         Queue_length += 2;
     }
     else
     {
-        newnode->next = NULL;
         myqueue->rear->next = newnode;
         myqueue->rear = newnode;
         Queue_length++;
