@@ -1,15 +1,6 @@
 #include "headers.h"
 
-///  buffer struct for process generator to scheduler queue 
-struct buff_GenSch
-{
-    int mtype;
-    struct process NewProcess; // process that will be sent from process generator to scheduler
-   
-};
 void clearResources(int);
-
-typedef struct process process;
 
 int main(int argc, char *argv[])
 {
@@ -30,18 +21,13 @@ int main(int argc, char *argv[])
 
     fclose(inputFile);
 
-    process *processes = (process *)malloc(processesNum * sizeof(process));
-
-    inputFile = fopen(argv[1], "r");
-
-    while (getline(&buffer, &bufsize, inputFile) != EOF)
-    {
-        fscanf(inputFile, "%d\t%d\t%d\t%d", &processes[index].id, &processes[index].arrival_time, &processes[index].runtime, &processes[index].priority);
-        index++;
-    }
-
     // 2. Read the chosen scheduling algorithm and its parameters, if there are any from the argument list.
-    schedulingAlgorithm = atoi(argv[1]);
+    schedulingAlgorithm = atoi(argv[2]);
+    if (schedulingAlgorithm < 1 || schedulingAlgorithm > 5)
+    {
+        printf("Invalid scheduling algorithm. Please choose a number between 1 and 5.\n");
+        return -1;
+    }
     if (schedulingAlgorithm == 5)
         quantum = atoi(argv[2]);
 
@@ -62,61 +48,69 @@ int main(int argc, char *argv[])
 
     else if (scheduler_processId == 0)
     {
-        sleep(5);
         system("./scheduler.out");
         exit(0);
     }
-    //  start sending the ready processes to the scheduler
-        key_t key1 ;
-        key1= ftok("genrator_to_sch", 65); 
-        int sen_val;
-        msgq_id_GenSch = msgget(key1, 0666 | IPC_CREAT);
-        if (  msgq_id_GenSch  == -1)
-            {
-                perror("Error in create up queue");
-                exit(-1);
-            }
-        // loop untill all the processes in the file sent to scheduler
-             int i =0;
-           while ( processesNum_sent_toSCH < processesNum)
-        {
-            if( processes[i].arrival_time == getClk() )
-            {
-                struct buff_GenSch process_msg;
-                process_msg.NewProcess= processes[i];
-                sen_val = msgsnd(msgq_id_GenSch, &process_msg, sizeof(process_msg.NewProcess), !IPC_NOWAIT);
-                processesNum_sent_toSCH ++;
-            }
-            // we may reach end of the array but still there are some processes not sent to scheduler yet
-            if( i == processesNum)
-              i=0;
-             else
-             i++;
-           
-        }
-    
+
     // 4. Use this function after creating the clock process to initialize clock.
     initClk();
-    // To get time use this function.
-    int x = getClk();
-    while (1)
-    {
-        if (getClk() != x)
-        {
-            x = getClk();
-            printf("Current Time is %d\n", x);
-        }
-    }
 
     // TODO Generation Main Loop
+
     // 5. Create a data structure for processes and provide it with its parameters.
+    Process *processes = (Process *)malloc(processesNum * sizeof(Process));
+
+    inputFile = fopen(argv[1], "r");
+
+    while (getline(&buffer, &bufsize, inputFile) != EOF)
+    {
+        fscanf(inputFile, "%d\t%d\t%d\t%d", &processes[index].id, &processes[index].arrival_time, &processes[index].runtime, &processes[index].priority);
+        index++;
+    }
+
+    fclose(inputFile);
+
+    // start sending the ready processes to the scheduler
+
+    key_t key1 = ftok("keyfile", msgq_genSchKey);
+    msgq_id_GenSch = msgget(key1, 0666 | IPC_CREAT);
+    if (msgq_id_GenSch == -1)
+    {
+        perror("Error in create msg queue");
+        exit(-1);
+    }
+
     // 6. Send the information to the scheduler at the appropriate time.
+
+    int i = 0, sen_val;
+
+    // loop untill all the processes in the file are sent to scheduler
+    while (processesNum_sent_toSCH < processesNum)
+    {
+        if (processes[i].arrival_time == getClk())
+        {
+            Message process_msg;
+            process_msg.NewProcess = processes[i];
+            if (sen_val = msgsnd(msgq_id_GenSch, &process_msg, sizeof(process_msg.NewProcess), !IPC_NOWAIT) != 1)
+                perror("Errror in sending process to scheduler");
+            processesNum_sent_toSCH++;
+        }
+
+        // we may reach end of the array but still there are some processes not sent to scheduler yet
+        // if (i == processesNum)
+        //     i = 0;
+        // else
+        //     i++;
+    }
+
     // 7. Clear clock resources
+    msgctl(msgq_id_GenSch, IPC_RMID, (struct msqid_ds *)0);
     destroyClk(true);
 }
 
 void clearResources(int signum)
 {
     //TODO Clears all resources in case of interruption
+    msgctl(msgq_id_GenSch, IPC_RMID, (struct msqid_ds *)0);
     exit(0);
 }
