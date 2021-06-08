@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
 
     else if (scheduler_processId == 0)
     {
-        char *runCommand = (char *)malloc(21 * sizeof(char));
+        char *runCommand = (char *)malloc(23 * sizeof(char));
         char buffer[10];
         if (schedulingAlgorithm == 5)
             sprintf(buffer, "%d %d %d", processesNum, schedulingAlgorithm, quantum);
@@ -90,10 +90,8 @@ int main(int argc, char *argv[])
     {
         if (processes[processesNum_sent_toSCH].arrival_time == getClk())
         {
-            Message process_msg;
-            process_msg.NewProcess = processes[processesNum_sent_toSCH];
-            if (sen_val = msgsnd(msgq_id_GenSch, &process_msg, sizeof(process_msg.NewProcess), !IPC_NOWAIT) == 1)
-                perror("Error in sending process to scheduler");
+            printf("send process: %d\n", processes[processesNum_sent_toSCH].id);
+            sendMsg(processes[processesNum_sent_toSCH], msgq_id_GenSch);
             processesNum_sent_toSCH++;
         }
 
@@ -104,7 +102,6 @@ int main(int argc, char *argv[])
         //     i++;
     }
 
-    printf("Time: %d\n", getClk());
     // 7. Clear clock resources
     msgctl(msgq_id_GenSch, IPC_RMID, (struct msqid_ds *)0);
     destroyClk(true);

@@ -10,14 +10,14 @@ void RR(int);
 
 int msgq_id_PrcSch;
 int shmid;
-void *shm_addr;
+int *remainingTime;
 Queue *Ready_queue;
 Process addedProcess;
 PCB *PCB_LIST;
 int Ready_NUm_processes = 0;
 
 /// BUFFERS
-processSchedulermsgbuff message;
+Message message;
 Message process_msg;
 
 // variables used to write in the files
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
     msgq_id_PrcSch = initMsgq(msgq_prcSchKey);
 
     // create shared memory to write /read   remaining time / execuation time in it =>> Process.c
-    shm_addr = initShm(shmKey, &shmid);
+    remainingTime = (int *)initShm(shmKey, &shmid);
 
     Ready_queue = (Queue *)malloc(sizeof(Queue));
     initialize(Ready_queue);
@@ -110,8 +110,16 @@ int ProcessExecution()
 
     else if (pid == 0) // running process
     {
-        system("./process.out");
-        exit(-1);
+        printf("remaining time: %d\n", *remainingTime);
+        char *runCommand = (char *)malloc(18 * sizeof(char));
+        char buffer[10];
+        sprintf(buffer, "%d", *remainingTime);
+        strcpy(runCommand, "./process.out ");
+        strcat(runCommand, buffer);
+        printf("%s", buffer);
+        // system(runCommand);
+        // system("./process.out");
+        exit(0);
     }
 
     return pid; // return pid to know which child process will be terminated due to an algorithm
@@ -124,7 +132,7 @@ void checkRecievedProcess()
     int added;
 
     // from process generator
-    rec_process = msgrcv(msgq_id_GenSch, &process_msg, sizeof(process_msg.NewProcess), 0, !IPC_NOWAIT);
+    rec_process = msgrcv(msgq_id_GenSch, &process_msg, sizeof(process_msg.process), 0, !IPC_NOWAIT);
 
     if (rec_process == -1)
     {
@@ -132,7 +140,7 @@ void checkRecievedProcess()
         return;
     }
 
-    addedProcess = process_msg.NewProcess; // make my process equals to the process coming from the msg queue
+    addedProcess = process_msg.process; // make my process equals to the process coming from the msg queue
 
     added = addedProcess.id - 1; ////// remove -1
 
@@ -145,7 +153,7 @@ void checkRecievedProcess()
         enqueue_priority(addedProcess, addedProcess.priority);
     }
 
-    printf("added: %d\n", added);
+    printf("added: %d\n", added + 1);
     PCB_LIST[added].arrival_time = addedProcess.arrival_time;
     PCB_LIST[added].priority = addedProcess.priority;
     //    PCB_LIST[added].process_id=addedProcess.process_id;
@@ -170,40 +178,34 @@ void resumeProcess(int turn)
 
 int startProcess(Process turnProcess)
 {
-    message.running_process = turnProcess;
+    printf("start process: %d\n", turnProcess.id);
+    sendMsg(turnProcess, msgq_id_PrcSch);
 
-    int sen_val = msgsnd(msgq_id_PrcSch, &message, sizeof(message), !IPC_NOWAIT);
-    if (sen_val == -1)
-    {
-        perror("error in scheduler sending new prcoess ");
-        return -1;
-    }
-
-    /// run process.c
+    // run process.c
     return (ProcessExecution());
 }
 
 void sharedMemory_func(int RW, int remainTime)
 {
-    if (atoi(shm_addr) == -1)
+    if (atoi(remainingTime) == -1)
     {
-        perror("Scheduler: Error in attach in writer/reader ");
+        perror("Scheduler: Error in attach in writer/reader");
         exit(-1);
     }
     // read rexecution  time from the shared memory
     if (RW == 1)
     {
-        total_exec_time += atoi((char *)shm_addr);
+        total_exec_time += atoi((char *)remainingTime);
     }
     // write remaining time to the shared memory
     else
     {
         char buffer[10];
         sprintf(buffer, "%d", remainTime);
-        strcpy((char *)shm_addr, buffer);
+        strcpy((char *)remainingTime, buffer);
     }
     //TODO: not sure : destroy
-    shmdt(shm_addr);
+    shmdt(remainingTime);
 }
 
 void Check_finshed_processes(int ID)
@@ -237,6 +239,7 @@ void FCFS()
     while (Ready_NUm_processes <= processesNum)
     {
         checkRecievedProcess();
+        startProcess(addedProcess);
     }
 }
 
@@ -257,7 +260,7 @@ void HPF()
     {
         // check if the currently running process is finished
         if (HPF_Queue_size != -1) // check from the seocnd time
-            Check_finshed_processes(message.running_process.id);
+            Check_finshed_processes(message.process.id);
 
         checkRecievedProcess();
 
@@ -275,20 +278,20 @@ void HPF()
         {
             // save context switch
             // remain = total run - time stopped - started
-            PCB_LIST[message.running_process.id].remainingtime = message.running_process.runtime - getClk() - PCB_LIST[message.running_process.id].startingTime;
-            PCB_LIST[message.running_process.id].stopped_time = getClk();
+            PCB_LIST[message.process.id].remainingtime = message.process.runtime - getClk() - PCB_LIST[message.process.id].startingTime;
+            PCB_LIST[message.process.id].stopped_time = getClk();
             //TODO:send remaining time to process.c
-            sharedMemory_func(0, PCB_LIST[message.running_process.id].remainingtime);
+            sharedMemory_func(0, PCB_LIST[message.process.id].remainingtime);
 
             // inform process file to stop the process
-            stopProcess(message.running_process.id);
+            stopProcess(message.process.id);
 
             fprintf(pFile, "At time %d\t process %d\t stopped arr %d\t total %d\t remain %d\t wait\n",
-                    getClk(), message.running_process.id, message.running_process.arrival_time, message.running_process.runtime,
-                    PCB_LIST[message.running_process.id].remainingtime, PCB_LIST[message.running_process.id].waiting_time);
+                    getClk(), message.process.id, message.process.arrival_time, message.process.runtime,
+                    PCB_LIST[message.process.id].remainingtime, PCB_LIST[message.process.id].waiting_time);
 
             // rejoin it to the ready queue
-            enqueue_priority(message.running_process, message.running_process.priority);
+            enqueue_priority(message.process, message.process.priority);
             Ready_NUm_processes++;
         }
 
@@ -307,15 +310,15 @@ void HPF()
         // first time to run
         else
         {
-            message.running_process = HPF_Queue[current_turn].myProcess;
-            PCB_LIST[message.running_process.id].startingTime = getClk();
-            PCB_LIST[message.running_process.id].remainingtime = message.running_process.runtime;
+            message.process = HPF_Queue[current_turn].myProcess;
+            PCB_LIST[message.process.id].startingTime = getClk();
+            PCB_LIST[message.process.id].remainingtime = message.process.runtime;
             // write to the prcoess.c that remaining time is the whole run time
-            sharedMemory_func(1, PCB_LIST[message.running_process.id].runtime);
+            sharedMemory_func(1, PCB_LIST[message.process.id].runtime);
             fprintf(pFile, "At time %d\t process %d\t started arr %d\t total %d\t remain %d\t wait %d\n",
-                    getClk(), message.running_process.id, message.running_process.arrival_time, message.running_process.runtime, message.running_process.runtime, 0);
+                    getClk(), message.process.id, message.process.arrival_time, message.process.runtime, message.process.runtime, 0);
             // send the process parameters to process file
-            int process_id = startProcess(message.running_process);
+            int process_id = startProcess(message.process);
 
             if (process_id != -1)
             { //no errors occur during sending data of the process

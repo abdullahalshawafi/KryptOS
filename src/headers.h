@@ -26,6 +26,59 @@ char msgq_prcSchKey = 'B';
 char shmKey = 'C';
 //===============================//
 
+// Each process have a state of only two state running or blocked
+enum STATE
+{
+    running,
+    waiting
+};
+// struct for process contains its parameters
+struct Process
+{
+    int id,         //this id read from the input file
+        process_id, // this the actual id in the system
+        arrival_time,
+        runtime,
+        priority,
+        timeTaken;
+};
+typedef struct Process Process;
+
+// Buffer struct for process generator to scheduler msg queue
+struct Message
+{
+    long mtype;
+    Process process; // process that will be sent from process generator to scheduler
+};
+typedef struct Message Message;
+
+// Process can receive the changes in its state in a message queue
+// Or send timeTaken to the scheduler
+struct processSchedulermsgbuff
+{
+    long mtype;
+    //int timeTaken;
+    Process process;
+};
+typedef struct processSchedulermsgbuff processSchedulermsgbuff;
+
+//
+struct PCB
+{
+    int id,         // this id read from the input file
+        process_id, // this the actual id in the system
+        arrival_time,
+        runtime,
+        priority,
+        remainingtime,
+        startingTime,
+        stopped_time,
+        resume_time,
+        waiting_time;
+    enum STATE state;
+};
+typedef struct PCB PCB;
+
 int getClk()
 {
     return *shmaddr;
@@ -61,19 +114,33 @@ int initMsgq(int key)
     return msgqId;
 }
 
+void sendMsg(Process process, int msgqId)
+{
+    Message message;
+    message.process = process;
+    int send_val;
+    if ((send_val = msgsnd(msgqId, &message, sizeof(message.process), !IPC_NOWAIT)) == -1)
+        perror("Error in sending the process");
+}
+
 void *initShm(char key, int *id)
 {
     key_t shmKey = ftok("keyfile", key);
     int shmId = shmget(shmKey, 4096, 0666 | IPC_CREAT);
     *id = shmId;
 
-    if (!~shmId)
+    if (shmId == -1)
     {
         perror("Error in creating of message queue");
         exit(-1);
     }
 
     void *addr = shmat(shmId, (void *)0, 0);
+    if (shmaddr == -1)
+    {
+        perror("Error in attaching shared memory");
+        exit(-1);
+    }
     return addr;
 }
 
@@ -92,57 +159,6 @@ void destroyClk(bool terminateAll)
         killpg(getpgrp(), SIGINT);
     }
 }
-// Each process have a state of only two state running or blocked
-enum STATE
-{
-    running,
-    waiting
-};
-// struct for process contains its parameters
-struct Process
-{
-    int id,         //this id read from the input file
-        process_id, // this the actual id in the system
-        arrival_time,
-        runtime,
-        priority;
-};
-typedef struct Process Process;
-
-// Buffer struct for process generator to scheduler msg queue
-struct Message
-{
-    int mtype;
-    Process NewProcess; // process that will be sent from process generator to scheduler
-};
-typedef struct Message Message;
-
-// Process can receive the changes in its state in a message queue
-// Or send timeTaken to the scheduler
-struct processSchedulermsgbuff
-{
-    long mtype;
-    int timeTaken;
-    Process running_process;
-};
-typedef struct processSchedulermsgbuff processSchedulermsgbuff;
-
-//
-struct PCB
-{
-    int id,         // this id read from the input file
-        process_id, // this the actual id in the system
-        arrival_time,
-        runtime,
-        priority,
-        remainingtime,
-        startingTime,
-        stopped_time,
-        resume_time,
-        waiting_time;
-    enum STATE state;
-};
-typedef struct PCB PCB;
 
 ////------------- general variables declerations -------------////
 int schedulingAlgorithm, quantum = -1;
