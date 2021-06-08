@@ -14,7 +14,7 @@ struct processSchedulermsgbuff
 // We store the remaining time to decrement it if the clock value
 // increased and the process was running
 int remainingtime, startingTime, pid, lastClk , runtime, arrivaltime;
-
+int execution_time;
 int main(int agrc, char *argv[])
 {
     // Initialize clock and set remaining time and startTime
@@ -38,7 +38,23 @@ int main(int agrc, char *argv[])
             perror("Error in creating message queue in process: " + pid);
             exit(-1);
         }
-
+/// Create shared memory to write el remaining time and execuation time in it =>> scheduler
+    key_t key2 ;
+    key2 = ftok("shm_running_time", 55); 
+    int shmid;
+    shmid = shmget(key2, 4096, IPC_CREAT | 0644);  
+    if (shmid == -1)
+    {
+        perror("process.c : Error in create shared memory");
+        exit(-1);
+    }
+      
+     void *shmaddr = shmat(shmid, (void *)0, 0);
+    if (atoi(shmaddr) == -1)
+    {
+        perror("process.c: Error in attach in writer (running time)");
+        exit(-1);
+    }
     /// recieve which process's PCB will be running
         struct processSchedulermsgbuff message;
                 int recValue = msgrcv(msgq_id_PrcSch, &message, sizeof(message.running_process), pid, IPC_NOWAIT);
@@ -54,15 +70,23 @@ int main(int agrc, char *argv[])
 
     while (remainingtime > 0)
     {
+        //TODO:  msh 3arfa ek trteb hna hyfr2 wla la2 y3ny a-check remaining time  first wla azwd el running time
         
-            // When clock changes (increases) reduce remainingtime
+           // calculate the real running time
             int newClk = getClk();
             if (newClk != lastClk)
-                remainingtime--;
+               execution_time++;
             lastClk = newClk;
-    
+
+        /// read the remaining time from the scheduler
+                remainingtime=  atoi ((char *)shmaddr);
     }
 
-    /// bye
+     
+    /// before termination write the execution_time to 
+    //shared memory so that el scheduler can read it ( to sum execution_time  of all prcoesses)
+       strcpy((char *)shmaddr,  itoa(execution_time));
+    // free it
+    shmdt(shmaddr);
     return 0;
 }
