@@ -49,14 +49,26 @@ process addedProcess;
 PCB * PCB_LIST;
 int Ready_NUm_processes=0;
 
+/// BUFFERS
 struct processSchedulermsgbuff message;
 struct buff_GenSch process_msg;
+
+// variables used to write in the files
 FILE *pFile;
+float CPU_U;
+float WT;
+float WTA;
+float WTA_total;
+float WT_total;
+// need to compute them
+int sys_start_time_;
+int  total_exec_time; 
 
 // data structures used for algorithms 
 int DS_Queue=1;
 int DS_PrioirtyQ=2;
 int myUsedDS;
+
 
 ///----------------------------------------------- MAIN --------------------------------------------------------
 int main(int argc, char *argv[])
@@ -78,7 +90,6 @@ int main(int argc, char *argv[])
                 perror("Error in create up queue");
                 exit(-1);
             }
-
       //  msq queue to talk to process file
         key_t key2 ;
         key2 = ftok("processto_sch", 66); 
@@ -102,10 +113,15 @@ int main(int argc, char *argv[])
                 case 5: RR(quantum);
                     break;    
             }
-      
-    
+     close(pFile); // close the file emta msh 3arfa rabna ysahl
 
-    //TODO: upon termination release the clock resources.
+            pFile = fopen("Scheduler.pref", "w");
+            CPU_U = (getClk() - sys_start_time_)/ total_exec_time ;
+            fprintf(pFile, "A CPU utilization = %d\t \n", CPU_U);
+            fprintf(pFile, "Avg WTA = %d\t \n",  WT_total/processesNum);
+            fprintf(pFile, "Avg Waiting = %d\t \n", WT_total/processesNum);
+            close(pFile); 
+//TODO: upon termination release the clock resources. ?????????????
 
     destroyClk(true);
 }
@@ -198,21 +214,24 @@ int startProcess(process turnProcess){
 }
 
 
-void finshed_processes()
+void Check_finshed_processes( int ID )
 {
-     for ( int i=0; i < processesNum ; i++)
-         {
-             if ( PCB_LIST[i].remainingtime == 0 )
-             {
-                 // finsh getclk
-                // PCB_LIST[i].waiting_time= arr - finish - run
-                // TA = arr - finish
+    if ( PCB_LIST[ID].remainingtime == 0 )
+     {
+                
+            // TA = finish - arr (total life time)
+              WTA= (getClk() -PCB_LIST[ID].arrival_time) / PCB_LIST[ID].runtime;
+              WTA_total+=WTA;
+            // finsh getclk -  arr - run
+               WT=  getClk() -PCB_LIST[ID].arrival_time-PCB_LIST[ID].runtime;
+               WT_total+=WT;
+
                   fprintf(pFile, "At time %d\t process %d\t finished arr %d\t total %d\t remain %d\t wait\n",
-                  getClk(),PCB_LIST[i].id , PCB_LIST[i].arrival_time, PCB_LIST[i].runtime,
-                   0 ,0 );
-                   /// free pcb
-             }
-         }
+                  getClk(),PCB_LIST[ID].id , PCB_LIST[ID].arrival_time, PCB_LIST[ID].runtime,
+                   0 , PCB_LIST[ID].waiting_time);
+
+            //free (PCB_LIST[id]);
+    }
 }
 
 void FCFS() {}
@@ -232,8 +251,9 @@ void HPF ()
     //loop till the queue is empty
      while( Ready_NUm_processes > 0 ||  HPF_Queue_size ==-1   ) // or first time
      {
-        // check if thers is a prcoess that finished
-        finshed_processes();
+        // check if the currently running process is finished
+         if(HPF_Queue_size != -1) // check from the seocnd time
+         Check_finshed_processes( message.running_process.id);
 
         checkRecievedProcess();
 
@@ -244,9 +264,7 @@ void HPF ()
         // get process with highest priority make it running and send it to the process  
         current_process_index=current_turn; 
         current_turn= peek_priority();
-
-    
-            
+      
         // check if the added process has higher priority that the current running process
         // TODO: need handle first time 
         if ( current_process_index != current_turn ) // awl mara???
@@ -274,7 +292,7 @@ void HPF ()
             {
                 resumeProcess((HPF_Queue[current_turn].myProcess.id));
 
-                PCB_LIST[HPF_Queue[current_turn].myProcess.id].waiting_time=  getClk() -PCB_LIST[message.running_process.id].stopped_time;
+                PCB_LIST[HPF_Queue[current_turn].myProcess.id].waiting_time +=  getClk() -PCB_LIST[message.running_process.id].stopped_time;
                 
                 fprintf(pFile, "At time %d\t process %d\t resumed arr %d\t total %d\t remain %d\t wait\n",
                   getClk(), HPF_Queue[current_turn].myProcess.id , message.running_process.arrival_time, message.running_process.runtime,

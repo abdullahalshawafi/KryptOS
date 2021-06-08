@@ -202,7 +202,7 @@ int peek_priority()
             highestPriority = HPF_Queue[i].priority;
             ind = i;
         }
-        else if (highestPriority >  HPF_Queue[i].priority) 
+        else if (highestPriority >=  HPF_Queue[i].priority) 
         {  
             highestPriority = HPF_Queue[i].priority;
             ind = i;
