@@ -15,6 +15,7 @@ int shmid;
 int *remainingTime;
 Queue *Ready_queue;
 Process addedProcess;
+Process runningProcess;
 PCB *PCB_LIST;
 int Ready_NUm_processes = 0;
 
@@ -278,6 +279,8 @@ void HPF()
         if (HPF_Queue_size != -1) // check from the seocnd time
             Check_finshed_processes(message.process.id);
 
+        
+
         checkRecievedProcess();
         printf("after reciev: \n");
         // no processes currently to schedule
@@ -357,87 +360,84 @@ void SRTN() {}
 
 //------------------------------------------ For Round Robin -------------------------------------------
 
-void RR(int quantum)
-{
+void RR(int quantum){
 
-    int currentTime;
-    int turn;
+    myUsedDS=1;
+    int turn=1;
+    int quantum_check=quantum;
+    Process process_turn;
 
-    // if its the first time for the algorithm or if ready processes has ended
-    while (Queue_length == -1 || Ready_NUm_processes > 0)
-    {
-
+  
+        // if its the first time for the algorithm or if ready processes has ended
+    while (Queue_length==-1 || Ready_NUm_processes >0){
+            
         // check if i received any new process then add it to my PCB
         checkRecievedProcess();
+       
+        if(Queue_length==-1)
+            continue;
 
-        Process process_turn = dequeue(Ready_queue);
-        Ready_NUm_processes--;
-        turn = process_turn.id;
+        if(Ready_queue->count==1)
+            runningProcess=addedProcess;
+        
 
-        if (PCB_LIST[turn].state == waiting)
-        { //has started before
+        printf("Queue's length is %d\n",Ready_queue->count);
+        printf("Ready processes are %d\n",Ready_NUm_processes);
 
-            // ------------------ Get data before resuming ---------------------------------------
-            PCB_LIST[turn].waiting_time = getClk() - PCB_LIST[turn].stopped_time;
+        quantum_check--; //in each iteration receive new processes and keep running the current process for a quantum
+       
+        printf("Quantum till now =%d\n",quantum_check);
 
-            fprintf(pFile, "At time %d\t process %d\t resumed arr %d\t total %d\t remain %d\t wait\n",
-                    getClk(), process_turn.id, process_turn.arrival_time, process_turn.runtime,
-                    PCB_LIST[turn].remainingtime, PCB_LIST[turn].waiting_time);
-            // ------------------------------------------------------------------------------------
+        printf("Turn is %d\n",turn);
+        printf("PCB[turn] %d\n",PCB_LIST[turn].id);
 
-            resumeProcess(PCB_LIST[turn].process_id);
+        if(quantum_check==0){
+        // --------------- saving data before stopping ----------------------
+       
+        // --------------------------------------------------------------------------------------  
+            printf("Stopped\n");
+            enqueue(Ready_queue,process_turn);
+            Ready_NUm_processes++; 
+            quantum_check=quantum;      
+            stopProcess(turn);
+        
+       }
+
+
+        else if(PCB_LIST[turn].state==waiting && quantum_check==quantum) { //has started before
+
+        // ------------------ Get data before resuming ---------------------------------------
+           
+        // ------------------------------------------------------------------------------------
+
+            printf("Process %d will continue my work\n",turn);
+            resumeProcess(PCB_LIST[turn].process_id); 
         }
 
-        else
-        { // first time
-            int process_id = startProcess(process_turn);
+        
+        else { // first time     
+            int process_id=startProcess(process_turn);
 
-            if (process_id != -1)
-            { //no errors occur during sending data of the process
-                PCB_LIST[turn].process_id = process_id;
+            if(process_id!=-1){ //no errors occur during sending data of the process
+
+                    printf("First visit\n");
+                    PCB_LIST[turn].process_id=process_id;
 
                 // ------------------ Saving the first data for the process -------------------------
-                PCB_LIST[turn].startingTime = getClk();
-                PCB_LIST[turn].remainingtime = process_turn.runtime;
-
-                fprintf(pFile, "At time %d\t process %d\t started arr %d\t total %d\t remain %d\t wait %d\n",
-                        getClk(), process_turn.id, process_turn.arrival_time,
-                        process_turn.runtime, process_turn.runtime, 0);
+                   
+                  
                 //----------------------------------------------------------------------------------
+
+                    process_turn=dequeue(Ready_queue);
+                    runningProcess=process_turn;
+                    Ready_NUm_processes--; 
+                    turn=runningProcess.id;
+     
+                }
             }
-        }
 
-        // habaaalllllll-------------------------------------
-        currentTime = getClk();
-
-        while (currentTime + quantum > getClk())
-        {
-            int newClk = getClk();
-            if (newClk != currentTime)
-                currentTime++;
-            currentTime = newClk;
-        }
-
-        // --------------- saving data before stopping ----------------------
-        PCB_LIST[turn].remainingtime = process_turn.runtime - getClk() - PCB_LIST[turn].startingTime;
-        PCB_LIST[turn].stopped_time = getClk();
-
-        fprintf(pFile, "At time %d\t process %d\t stopped arr %d\t total %d\t remain %d\t wait\n",
-                getClk(), process_turn.id, process_turn.arrival_time, process_turn.runtime,
-                PCB_LIST[turn].remainingtime, 0);
-
-        // --------------------------------------------------------------------------------------
-        stopProcess(turn);
-
-        if (PCB_LIST[turn].remainingtime == 0) //// check thissssss
-        {
-            // delete its pcb ---> create a finish function
-        }
-
-        else
-        {
-            enqueue(Ready_queue, process_turn);
-            Ready_NUm_processes++;
-        }
+            printf("%d\n",Ready_NUm_processes);
+             
+      
     }
 }

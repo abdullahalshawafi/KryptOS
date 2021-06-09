@@ -198,6 +198,7 @@ struct Queue
 {
     Node *front;
     Node *rear;
+    int count;
 };
 typedef struct Queue Queue;
 
@@ -205,11 +206,12 @@ void initialize(Queue *queue)
 {
     queue->front = NULL;
     queue->rear = NULL;
+    queue->count=0;
 }
 
 void enqueue(Queue *myqueue, Process new_process)
 {
-    Node *newnode = (Node *)malloc(sizeof(Node));
+    Node *newnode = malloc(sizeof(Node));
     newnode->myprocess = new_process;
     newnode->next = NULL;
     if (Queue_length == -1)
@@ -217,12 +219,14 @@ void enqueue(Queue *myqueue, Process new_process)
         myqueue->front = newnode;
         myqueue->rear = myqueue->front;
         Queue_length += 2;
+        myqueue->count++;
     }
     else
     {
         myqueue->rear->next = newnode;
         myqueue->rear = newnode;
         Queue_length++;
+         myqueue->count++;
     }
 }
 
@@ -241,6 +245,7 @@ Process dequeue(Queue *myqueue)
         free(temp);
     }
     Queue_length--;
+     myqueue->count--;
 
     return deleted;
 }
