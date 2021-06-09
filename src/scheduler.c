@@ -512,6 +512,7 @@ void RR(int quantum)
                     process_turn = dequeue(Ready_queue);
                     runningProcess = process_turn;
                     turn = runningProcess.id;
+                    *shm_remainingTime=PCB_LIST[turn].remainingtime;
                 }
             }
         }
