@@ -149,7 +149,7 @@ void checkRecievedProcess()
     // from process generator
     addedProcess = receiveMsg(msgq_id_GenSch);
     addedId = addedProcess.id;
-     num_of_proceesse_recieved++;
+    num_of_proceesse_recieved++;
     if (myUsedDS == DS_Queue)
     {
         enqueue(Ready_queue, addedProcess);
@@ -412,61 +412,86 @@ void RR(int quantum)
     int theEnd = 0;
     int lastClk;
 
-    while ((Queue_length == -1 || Ready_queue->count > 0) && theEnd == 0)
+    *shm_remainingTime=-1;
+
+    while (num_of_proceesse_recieved < processesNum)
     {
 
-        printf("Clock now is %d", getClk());
-        // check if i received any new process then add it to my PCB
+    // check if i received any new process then add it to my PCB
 
         checkRecievedProcess();
-       // quantum_check--; //in each iteration receive new processes and keep running the current process for a quantum
+        quantum_check--; //in each iteration receive new processes and keep running the current process for a quantum
+
+        if (Ready_queue->count == 1) 
+        {
+                    runningProcess = addedProcess;
+                    turn = runningProcess.id;
+        }
+
+        printf("------------------------------ running : %d  \n", runningProcess.id);
+       
 
         if (*shm_remainingTime == 0)
         {
-           // Check_finshed_processes(runningProcess.id);
-            quantum_check = quantum;
+            finshed_processe(runningProcess.id);
+            *shm_remainingTime=-1;
+             quantum_check = quantum;
         }
 
-        if (Queue_length == -1)
-            continue;
 
-        if (Ready_queue->count == 1)
-        {
-            runningProcess = addedProcess;
-            turn = runningProcess.id;
-        }
-
-        printf("Quantum till now =%d\n", quantum_check);
-
+       
         // printf("Turn is %d\n",turn);
         // printf("PCB[turn] %d\n",PCB_LIST[turn].id);
 
-        if (quantum_check == 0)
+        if (quantum_check == 0) 
         {
             // --------------- saving data before stopping ----------------------
 
             // --------------------------------------------------------------------------------------
             //   printf("Stopped Process with id= %d and remaining time=%d\n",PCB_LIST[turn].id,*shm_remainingTime);
+             if (*shm_remainingTime !=-1){
 
-            enqueue(Ready_queue, runningProcess);
-            quantum_check = quantum;
-            stopProcess(turn);
-        }
-
-        else if (PCB_LIST[turn].state == waiting && quantum_check == quantum)
+                enqueue(Ready_queue, runningProcess);
+                quantum_check = quantum;
+                stopProcess(turn);
+                *shm_remainingTime=-1;
+            }
+         
+          if (PCB_LIST[turn].state == waiting)
         { //has started before
 
             // ------------------ Get data before resuming ---------------------------------------
+            printf("in resumming block\n");
+            
+           
+            PCB_LIST[turn].waiting_time += getClk() - PCB_LIST[turn].stopped_time;
 
+            fprintf(  logFile , "At time %d\t process %d\t resumed arr %d\t total %d\t remain %d\t wait\n",
+                    getClk(), turn, PCB_LIST[turn].arrival_time, PCB_LIST[turn].runtime,
+                    PCB_LIST[turn].remainingtime, PCB_LIST[turn].waiting_time);
+            
             // ------------------------------------------------------------------------------------
 
-            //    printf("Process will continue working, with id= %d and has remaining time=%d\n",PCB_LIST[turn].id,PCB_LIST[turn].remainingtime);
 
             resumeProcess(PCB_LIST[turn].process_id);
         }
 
         else
         { // first time
+           printf("in starting block\n");
+            // save data of the running process in pcb
+               
+                PCB_LIST[turn].startingTime = getClk();
+                PCB_LIST[ turn].remainingtime =  runningProcess.runtime;
+                PCB_LIST[ turn].runtime=runningProcess.runtime;
+                PCB_LIST[ turn].arrival_time= runningProcess.arrival_time;
+                PCB_LIST[ turn].id=addedProcess.id;
+                PCB_LIST[ turn].state= running;
+                PCB_LIST[ turn].waiting_time= getClk()- runningProcess.arrival_time;
+                
+     printf( "At time %d\t process %d\t started arr %d\t total %d\t remain %d\t wait %d\n",
+        getClk(),runningProcess.id, runningProcess.arrival_time, runningProcess.runtime, runningProcess.runtime,  PCB_LIST[ turn].waiting_time);
+ 
             int process_id = startProcess(runningProcess);
 
             if (process_id != -1)
@@ -475,8 +500,7 @@ void RR(int quantum)
                 printf("First visit\n");
                 PCB_LIST[turn].process_id = process_id;
 
-                // ------------------ Saving the first data for the process -------------------------
-
+               
                 //----------------------------------------------------------------------------------
 
                 if (Ready_queue->front == NULL)
@@ -491,17 +515,11 @@ void RR(int quantum)
                 }
             }
         }
-
-        bool flag = false;
-        while (!flag)
-        {
-            int newClk = getClk();
-            if (newClk != lastClk)
-            {
-                flag = true;
-                // printf("Process with id= %d has remaining time=%d after 1 clock cycle\n",PCB_LIST[turn].id,PCB_LIST[turn].remainingtime);
-            }
-            lastClk = newClk;
         }
+        
     }
+
+     while (getClk() == lastClk)
+            ;
+    lastClk = getClk();
 }
