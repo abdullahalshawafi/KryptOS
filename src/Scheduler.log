@@ -1,1 +1,3 @@
 #At time x process y started arr w total z remain y wait k
+At time 3 process 1 started arr 3 total 26 remain 26 wait 0
+At time 7 process 2 started arr 7 total 21 remain 21 wait 26
