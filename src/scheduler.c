@@ -23,7 +23,7 @@ Message message;
 Message process_msg;
 
 // variables used to write in the files
-FILE *pFile;
+FILE *pFile, *logFile;
 float CPU_U, WT, WTA, WTA_total, WT_total;
 
 // need to compute them
@@ -46,7 +46,11 @@ int main(int argc, char *argv[])
     if (schedulingAlgorithm == 5)
         quantum = atoi(argv[3]);
 
-    PCB_LIST = (PCB *)malloc(processesNum * sizeof(PCB));
+    PCB_LIST = (PCB *)malloc((processesNum + 1) * sizeof(PCB));
+    PCB NullPCBItem;
+    NullPCBItem.runtime = 0;
+    NullPCBItem.waiting_time = 0;
+    PCB_LIST[0] = NullPCBItem;
     //pFile = fopen("Scheduler.log", "w");
     //fclose(pFile); // close the file emta msh 3arfa rabna ysahl
 
@@ -61,9 +65,15 @@ int main(int argc, char *argv[])
     // create shared memory to write /read   remaining time / execuation time in it =>> Process.c
     remainingTime = (int *)initShm(shmKey, &shmid);
 
+    // create shared memory to detect the finished state of the scheduler
+    finished = (int *)initShm(finishedKey, &shmFinishedId);
+
+    // initializing the ready queue
     Ready_queue = (Queue *)malloc(sizeof(Queue));
     initialize(Ready_queue);
 
+    logFile = fopen("Scheduler.log", "w");
+    fprintf(logFile, "#At time x process y started arr w total z remain y wait k\n");
     switch (schedulingAlgorithm)
     {
     case 1:
@@ -82,6 +92,7 @@ int main(int argc, char *argv[])
         RR(quantum);
         break;
     }
+    fclose(logFile);
 
     // fclose(pFile); // close the file emta msh 3arfa rabna ysahl
 
@@ -95,6 +106,7 @@ int main(int argc, char *argv[])
 
     shmctl(shmid, IPC_RMID, NULL);
     destroyClk(true);
+    *finished = 1;
 }
 
 void clearResources(int signum)
@@ -103,13 +115,14 @@ void clearResources(int signum)
     shmctl(shmid, IPC_RMID, NULL);
     exit(0);
 }
-char* my_itoa(int num, char *str)
+
+char *my_itoa(int num, char *str)
 {
-        
-        sprintf(str, "%d", num);
-        return str;
+    sprintf(str, "%d", num);
+    return str;
 }
-int ProcessExecution( Process turnProcess )
+
+int startProcess(Process turnProcess)
 {
     int pid = fork();
 
@@ -119,18 +132,18 @@ int ProcessExecution( Process turnProcess )
     else if (pid == 0) // running process
     {
         printf("remaining time: %d\n", addedProcess.runtime);
- //sendMsg(msgq_id_PrcSch, turnProcess , getpid());
-   printf("created chile with id : %d\n", getpid());
-       
-      char id_string[20];
-      char  remaintime_string[20];
-     
-      sprintf( id_string, "%d",turnProcess.id );
-      sprintf( remaintime_string, "%d",turnProcess.runtime);
-      execl("./process.out","./process.out",remaintime_string, id_string,NULL);
-    //  snprintf() 
-      
-       // exit(0);
+        //sendMsg(msgq_id_PrcSch, turnProcess , getpid());
+        printf("created chile with id : %d\n", getpid());
+
+        char id_string[10];
+        char remaintime_string[10];
+
+        sprintf(id_string, "%d", turnProcess.id);
+        sprintf(remaintime_string, "%d", turnProcess.runtime);
+        execl("./process.out", "./process.out", remaintime_string, id_string, NULL);
+        //  snprintf()
+
+        // exit(0);
     }
     return pid; // return pid to know which child process will be terminated due to an algorithm
 }
@@ -143,22 +156,20 @@ void checkRecievedProcess()
 
     // from process generator
     addedProcess = receiveMsg(msgq_id_GenSch);
-    added = addedProcess.id - 1; ////// remove -1
+    added = addedProcess.id; ////// remove -1
 
     if (myUsedDS == DS_Queue)
     {
 
- enqueue(Ready_queue, addedProcess);
+        enqueue(Ready_queue, addedProcess);
     }
-       
+
     else if (myUsedDS = DS_PrioirtyQ)
     {
- enqueue_priority(addedProcess, addedProcess.priority);
- printf("priority enqueue id: %d\n",addedProcess.id);
- printf("HPF  id: %d\n",HPF_Queue[peek_priority()].myProcess.id);
-
+        enqueue_priority(addedProcess, addedProcess.priority);
+        printf("priority enqueue id: %d\n", addedProcess.id);
+        printf("HPF  id: %d\n", HPF_Queue[peek_priority()].myProcess.id);
     }
-       
 
     printf("received process id: %d\n", added + 1);
     PCB_LIST[added].arrival_time = addedProcess.arrival_time;
@@ -182,15 +193,6 @@ void resumeProcess(int turn)
     int id = PCB_LIST[turn].process_id;
     PCB_LIST[turn].state = running;
     kill(id, SIGCONT); //continue the stopped process
-}
-
-int startProcess(Process turnProcess)
-{
-    printf("start process: %d\n", turnProcess.id);
-    //sendMsg(msgq_id_PrcSch, turnProcess);
-  //  *remainingTime = turnProcess.runtime;
-    // run process.c
-   // return (ProcessExecution());
 }
 
 void sharedMemory_func(int RW, int remainTime)
@@ -246,11 +248,14 @@ void FCFS()
 {
     printf("In FCFS\n");
     myUsedDS = DS_Queue; // I'll use a normal queue
-    while (Ready_NUm_processes <= processesNum - 1)
+    while (Ready_NUm_processes < processesNum)
     {
         checkRecievedProcess();
-    // startProcess(addedProcess);
-       ProcessExecution( addedProcess);
+        printf("%d\n", Ready_NUm_processes);
+        int wt = PCB_LIST[Ready_NUm_processes - 1].runtime + PCB_LIST[Ready_NUm_processes - 1].waiting_time;
+        fprintf(logFile, "At time %d process %d started arr %d total %d remain %d wait %d\n",
+                getClk(), addedProcess.id, addedProcess.arrival_time, addedProcess.runtime, addedProcess.runtime, wt);
+        // startProcess(addedProcess);
     }
 }
 
@@ -273,30 +278,28 @@ void HPF()
         if (HPF_Queue_size != -1) // check from the seocnd time
             Check_finshed_processes(message.process.id);
 
-          checkRecievedProcess();
-          printf("after reciev: \n");
+        checkRecievedProcess();
+        printf("after reciev: \n");
         // no processes currently to schedule
-       
+
         // get process with highest priority make it running and send it to the process
         current_process_index = current_turn;
         current_turn = peek_priority();
-         printf("current index: %d  \n", current_process_index);
-           printf("current turn: %d  \n", current_turn);
-        
+        printf("current index: %d  \n", current_process_index);
+        printf("current turn: %d  \n", current_turn);
 
         // check if the added process has higher priority that the current running process
         // TODO: need handle first time
         if (current_process_index != current_turn) // awl mara???
         {
-                    printf("in stopping block\n");
-            
+            printf("in stopping block\n");
 
             // save context switch
             // remain = total run - time stopped - started
             PCB_LIST[message.process.id].remainingtime = message.process.runtime - getClk() - PCB_LIST[message.process.id].startingTime;
             PCB_LIST[message.process.id].stopped_time = getClk();
             //TODO:send remaining time to process.c
-           // sharedMemory_func(0, PCB_LIST[message.process.id].remainingtime);
+            // sharedMemory_func(0, PCB_LIST[message.process.id].remainingtime);
 
             // inform process file to stop the process
             stopProcess(message.process.id);
@@ -314,7 +317,7 @@ void HPF()
         if (PCB_LIST[HPF_Queue[current_turn].myProcess.id].state == waiting)
         {
             printf("in resumming block\n");
-            
+
             resumeProcess((HPF_Queue[current_turn].myProcess.id));
 
             PCB_LIST[HPF_Queue[current_turn].myProcess.id].waiting_time += getClk() - PCB_LIST[HPF_Queue[current_turn].myProcess.id].stopped_time;
@@ -328,12 +331,12 @@ void HPF()
         else
         {
             printf("in starting block\n");
-            
+
             message.process = HPF_Queue[current_turn].myProcess;
             PCB_LIST[message.process.id].startingTime = getClk();
             PCB_LIST[message.process.id].remainingtime = message.process.runtime;
             // write to the prcoess.c that remaining time is the whole run time
-          //  sharedMemory_func(1, PCB_LIST[message.process.id].runtime);
+            //  sharedMemory_func(1, PCB_LIST[message.process.id].runtime);
             fprintf(pFile, "At time %d\t process %d\t started arr %d\t total %d\t remain %d\t wait %d\n",
                     getClk(), message.process.id, message.process.arrival_time, message.process.runtime, message.process.runtime, 0);
             // send the process parameters to process file
@@ -354,82 +357,87 @@ void SRTN() {}
 
 //------------------------------------------ For Round Robin -------------------------------------------
 
-void RR(int quantum){
+void RR(int quantum)
+{
 
     int currentTime;
     int turn;
 
+    // if its the first time for the algorithm or if ready processes has ended
+    while (Queue_length == -1 || Ready_NUm_processes > 0)
+    {
 
-        // if its the first time for the algorithm or if ready processes has ended
-    while (Queue_length==-1 || Ready_NUm_processes >0){
-            
         // check if i received any new process then add it to my PCB
-        checkRecievedProcess(); 
-            
-        Process process_turn=dequeue(Ready_queue);
-        Ready_NUm_processes--; 
-        turn=process_turn.id;
+        checkRecievedProcess();
 
-        if(PCB_LIST[turn].state==waiting) { //has started before
+        Process process_turn = dequeue(Ready_queue);
+        Ready_NUm_processes--;
+        turn = process_turn.id;
 
-        // ------------------ Get data before resuming ---------------------------------------
-            PCB_LIST[turn].waiting_time=  getClk() -PCB_LIST[turn].stopped_time;
-                
+        if (PCB_LIST[turn].state == waiting)
+        { //has started before
+
+            // ------------------ Get data before resuming ---------------------------------------
+            PCB_LIST[turn].waiting_time = getClk() - PCB_LIST[turn].stopped_time;
+
             fprintf(pFile, "At time %d\t process %d\t resumed arr %d\t total %d\t remain %d\t wait\n",
-                  getClk(), process_turn.id , process_turn.arrival_time, process_turn.runtime,
-                  PCB_LIST[turn].remainingtime ,PCB_LIST[turn].waiting_time);
-        // ------------------------------------------------------------------------------------
-        
-            resumeProcess(PCB_LIST[turn].process_id); 
+                    getClk(), process_turn.id, process_turn.arrival_time, process_turn.runtime,
+                    PCB_LIST[turn].remainingtime, PCB_LIST[turn].waiting_time);
+            // ------------------------------------------------------------------------------------
+
+            resumeProcess(PCB_LIST[turn].process_id);
         }
 
-        
-        else { // first time     
-            int process_id=startProcess(process_turn);
+        else
+        { // first time
+            int process_id = startProcess(process_turn);
 
-            if(process_id!=-1){ //no errors occur during sending data of the process
-                    PCB_LIST[turn].process_id=process_id;
+            if (process_id != -1)
+            { //no errors occur during sending data of the process
+                PCB_LIST[turn].process_id = process_id;
 
                 // ------------------ Saving the first data for the process -------------------------
-                    PCB_LIST[turn].startingTime =getClk();
-                    PCB_LIST[turn].remainingtime=process_turn.runtime;
+                PCB_LIST[turn].startingTime = getClk();
+                PCB_LIST[turn].remainingtime = process_turn.runtime;
 
-                    fprintf(pFile, "At time %d\t process %d\t started arr %d\t total %d\t remain %d\t wait %d\n",
-                            getClk(), process_turn.id,process_turn.arrival_time,
-                             process_turn.runtime, process_turn.runtime,0 );
+                fprintf(pFile, "At time %d\t process %d\t started arr %d\t total %d\t remain %d\t wait %d\n",
+                        getClk(), process_turn.id, process_turn.arrival_time,
+                        process_turn.runtime, process_turn.runtime, 0);
                 //----------------------------------------------------------------------------------
-                }
             }
-             
-        // habaaalllllll-------------------------------------
-            currentTime=getClk();
+        }
 
-        while (currentTime+quantum>getClk()){
-                int newClk = getClk();
-                if (newClk != currentTime)
+        // habaaalllllll-------------------------------------
+        currentTime = getClk();
+
+        while (currentTime + quantum > getClk())
+        {
+            int newClk = getClk();
+            if (newClk != currentTime)
                 currentTime++;
-                currentTime = newClk;
+            currentTime = newClk;
         }
 
         // --------------- saving data before stopping ----------------------
-         PCB_LIST[turn].remainingtime =  process_turn.runtime- getClk() -PCB_LIST[turn].startingTime;
-         PCB_LIST[turn].stopped_time=getClk();
-       
+        PCB_LIST[turn].remainingtime = process_turn.runtime - getClk() - PCB_LIST[turn].startingTime;
+        PCB_LIST[turn].stopped_time = getClk();
+
         fprintf(pFile, "At time %d\t process %d\t stopped arr %d\t total %d\t remain %d\t wait\n",
                 getClk(), process_turn.id, process_turn.arrival_time, process_turn.runtime,
-                PCB_LIST[turn].remainingtime ,0);
+                PCB_LIST[turn].remainingtime, 0);
 
-        // --------------------------------------------------------------------------------------        
+        // --------------------------------------------------------------------------------------
         stopProcess(turn);
 
-        if(PCB_LIST[turn].remainingtime==0) //// check thissssss
+        if (PCB_LIST[turn].remainingtime == 0) //// check thissssss
         {
-                // delete its pcb ---> create a finish function
+            // delete its pcb ---> create a finish function
         }
 
-        else {
-                enqueue(Ready_queue,process_turn);
-                Ready_NUm_processes++; 
-         }
-}
+        else
+        {
+            enqueue(Ready_queue, process_turn);
+            Ready_NUm_processes++;
+        }
+    }
 }

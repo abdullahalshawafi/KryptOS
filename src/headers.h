@@ -20,10 +20,11 @@ typedef short bool;
 
 //===============================//
 // don't mess with this variable
-int *shmaddr;
+int *shmaddr, *finished;
 char msgq_genSchKey = 'A';
 char msgq_prcSchKey = 'B';
 char shmKey = 'C';
+char finishedKey = 'F';
 //===============================//
 
 // Each process have a state of only two state running or blocked
@@ -114,7 +115,7 @@ int initMsgq(int key)
     return msgqId;
 }
 
-void sendMsg(int msgqId, Process process , int processs_id)
+void sendMsg(int msgqId, Process process, int processs_id)
 {
     Message message;
     message.mtype = processs_id;
@@ -171,7 +172,7 @@ void destroyClk(bool terminateAll)
 
 ////------------- general variables declerations -------------////
 int schedulingAlgorithm, quantum = -1;
-int msgq_id_GenSch;
+int msgq_id_GenSch, shmFinishedId;
 int rec_process;
 int processesNum = 0; // no.of the processes read from the input file
 //int Current_processesNum = 0; // no. of the processes remaining (not finished)

@@ -12,8 +12,8 @@ int main(int agrc, char *argv[])
     remainingtime = atoi(argv[1]);
     startingTime = lastClk = getClk();
     int id = atoi(argv[2]);
-      printf("hello i am in process.c with is %d\n", getpid());
-      printf("i am process with is  %d  my remaining time %d\n", id, remainingtime);
+    printf("hello i am in process.c with is %d\n", getpid());
+    printf("i am process with is  %d  my remaining time %d\n", id, remainingtime);
 
     // Set the current state to be a running proccess
     enum STATE currentState = running;
@@ -23,16 +23,15 @@ int main(int agrc, char *argv[])
 
     // Create the message queue on which you will talk to the scheduler
     //int msgq_id_PrcSch = initMsgq(msgq_prcSchKey);
- 
+
     // recieve which process's PCB will be running
- //   Message message;
-   // int recValue = msgrcv(msgq_id_PrcSch, &message, sizeof(message.process), 0, IPC_NOWAIT);
+    //   Message message;
+    // int recValue = msgrcv(msgq_id_PrcSch, &message, sizeof(message.process), 0, IPC_NOWAIT);
     //if (recValue == -1)
-      //  perror("Process.c: Error in recieveing the process: ");
+    //  perror("Process.c: Error in recieveing the process: ");
 
     // give the prcoess its parameters (sent from scheduler)
     startingTime = getClk();
-    
 
     while (remainingtime > 0)
     {
@@ -41,14 +40,12 @@ int main(int agrc, char *argv[])
         // calculate the real running time
         int newClk = getClk();
         if (newClk != lastClk)
-           remainingtime--;
+            remainingtime--;
         lastClk = newClk;
-
-       
     }
 
     /// before termination write the execution_time to
     //shared memory so that el scheduler can read it ( to sum execution_time  of all prcoesses)
- 
+
     return 0;
 }
