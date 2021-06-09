@@ -414,7 +414,7 @@ void RR(int quantum)
 
     *shm_remainingTime=-1;
 
-    while (num_of_proceesse_recieved < processesNum)
+    while ((Queue_length==-1 || Ready_queue->count >0)&& theEnd==0){
     {
 
     // check if i received any new process then add it to my PCB
