@@ -344,62 +344,80 @@ void SRTN() {}
 
 //------------------------------------------ For Round Robin -------------------------------------------
 
-void RR(int quantum)
-{
+void RR(int quantum){
 
     int currentTime;
     int turn;
 
-    // if its the first time for the algorithm or if ready processes has ended
-    while (Queue_length == -1 || Ready_NUm_processes > 0)
-    {
-
+        // if its the first time for the algorithm or if ready processes has ended
+    while (Queue_length==-1 || Ready_NUm_processes >0){
+            
         // check if i received any new process then add it to my PCB
-        checkRecievedProcess();
+        checkRecievedProcess(); 
+            
+        Process process_turn=dequeue(Ready_queue);
+        Ready_NUm_processes--; 
+        turn=process_turn.id;
 
-        Process process_turn = dequeue(Ready_queue);
-        Ready_NUm_processes--;
-        turn = process_turn.id;
+        if(PCB_LIST[turn].state==waiting) { //has started before
 
-        if (PCB_LIST[turn].state == waiting)
-        { //has started before
-
-            //TODO: retrieve its data from the pcb
-            resumeProcess(PCB_LIST[turn].process_id);
+        // ------------------ Get data before resuming ---------------------------------------
+            PCB_LIST[turn].waiting_time=  getClk() -PCB_LIST[turn].stopped_time;
+                
+            fprintf(pFile, "At time %d\t process %d\t resumed arr %d\t total %d\t remain %d\t wait\n",
+                  getClk(), process_turn.id , process_turn.arrival_time, process_turn.runtime,
+                  PCB_LIST[turn].remainingtime ,PCB_LIST[turn].waiting_time);
+        // ------------------------------------------------------------------------------------
+        
+            resumeProcess(PCB_LIST[turn].process_id); 
         }
 
-        else
-        { // first time
-            int process_id = startProcess(process_turn);
+        
+        else { // first time     
+            int process_id=startProcess(process_turn);
 
-            if (process_id != -1)
-            { //no errors occur during sending data of the process
-                PCB_LIST[turn].process_id = process_id;
+            if(process_id!=-1){ //no errors occur during sending data of the process
+                    PCB_LIST[turn].process_id=process_id;
+
+                // ------------------ Saving the first data for the process -------------------------
+                    PCB_LIST[turn].startingTime =getClk();
+                    PCB_LIST[turn].remainingtime=process_turn.runtime;
+
+                    fprintf(pFile, "At time %d\t process %d\t started arr %d\t total %d\t remain %d\t wait %d\n",
+                            getClk(), process_turn.id,process_turn.arrival_time,
+                             process_turn.runtime, process_turn.runtime,0 );
+                //----------------------------------------------------------------------------------
+                }
             }
-        }
-
+             
         // habaaalllllll-------------------------------------
-        currentTime = getClk();
+            currentTime=getClk();
 
-        while (currentTime + quantum > getClk())
-        {
-            int newClk = getClk();
-            if (newClk != currentTime)
+        while (currentTime+quantum>getClk()){
+                int newClk = getClk();
+                if (newClk != currentTime)
                 currentTime++;
-            currentTime = newClk;
+                currentTime = newClk;
         }
 
+        // --------------- saving data before stopping ----------------------
+         PCB_LIST[turn].remainingtime =  process_turn.runtime- getClk() -PCB_LIST[turn].startingTime;
+         PCB_LIST[turn].stopped_time=getClk();
+       
+        fprintf(pFile, "At time %d\t process %d\t stopped arr %d\t total %d\t remain %d\t wait\n",
+                getClk(), process_turn.id, process_turn.arrival_time, process_turn.runtime,
+                PCB_LIST[turn].remainingtime ,0);
+
+        // --------------------------------------------------------------------------------------        
         stopProcess(turn);
 
-        if (PCB_LIST[turn].remainingtime == 0) //// check thissssss
+        if(PCB_LIST[turn].remainingtime==0) //// check thissssss
         {
-            // delete its pcb ---> create a finish function
+                // delete its pcb ---> create a finish function
         }
 
-        else
-        {
-            enqueue(Ready_queue, process_turn);
-            Ready_NUm_processes++;
-        }
-    }
+        else {
+                enqueue(Ready_queue,process_turn);
+                Ready_NUm_processes++; 
+         }
 }
