@@ -9,9 +9,11 @@ int main(int agrc, char *argv[])
 {
     // Initialize clock and set remaining time and startTime
     initClk();
-    remainingtime = atoi(argv[1]);
+    //remainingtime = atoi(argv[1]);
     startingTime = lastClk = getClk();
+    //int id = atoi(argv[2]);
       printf("hello i am in process.c with is %d\n", getpid());
+      //printf("i am process with is  %d  my remaining time %d\n", id, remainingtime);
 
     // Set the current state to be a running proccess
     enum STATE currentState = running;
@@ -20,22 +22,17 @@ int main(int agrc, char *argv[])
     pid = getpid();
 
     // Create the message queue on which you will talk to the scheduler
-    int msgq_id_PrcSch = initMsgq(msgq_prcSchKey);
-
-    // Create shared memory to write el remaining time and execuation time in it =>> scheduler
-    int shmid;
-    void *shm_addr = initShm(shmKey, &shmid);
-
+    //int msgq_id_PrcSch = initMsgq(msgq_prcSchKey);
+ 
     // recieve which process's PCB will be running
-    Message message;
-    int recValue = msgrcv(msgq_id_PrcSch, &message, sizeof(message.process), 0, IPC_NOWAIT);
-    if (recValue == -1)
-        perror("Process.c: Error in recieveing the process: ");
+ //   Message message;
+   // int recValue = msgrcv(msgq_id_PrcSch, &message, sizeof(message.process), 0, IPC_NOWAIT);
+    //if (recValue == -1)
+      //  perror("Process.c: Error in recieveing the process: ");
 
     // give the prcoess its parameters (sent from scheduler)
     startingTime = getClk();
-    runtime = message.process.runtime;
-    arrivaltime = message.process.arrival_time;
+    
 
     while (remainingtime > 0)
     {
@@ -44,19 +41,14 @@ int main(int agrc, char *argv[])
         // calculate the real running time
         int newClk = getClk();
         if (newClk != lastClk)
-            execution_time++;
+           remainingtime--;
         lastClk = newClk;
 
-        /// read the remaining time from the scheduler
-        remainingtime = atoi((char *)shm_addr);
+       
     }
 
     /// before termination write the execution_time to
     //shared memory so that el scheduler can read it ( to sum execution_time  of all prcoesses)
-    char buffer[10];
-    sprintf(buffer, "%d", execution_time);
-    strcpy((char *)shm_addr, buffer);
-    // free it
-    shmdt(shm_addr);
+ 
     return 0;
 }

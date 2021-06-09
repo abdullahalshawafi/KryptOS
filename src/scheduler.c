@@ -1,5 +1,7 @@
 #include "headers.h"
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 void clearResources(int);
 
 void FCFS();
@@ -101,7 +103,15 @@ void clearResources(int signum)
     shmctl(shmid, IPC_RMID, NULL);
     exit(0);
 }
-
+char *my_itoa(int num, char *str)
+{
+        if(str == NULL)
+        {
+                return NULL;
+        }
+        sprintf(str, "%d", num);
+        return str;
+}
 int ProcessExecution( Process turnProcess )
 {
     int pid = fork();
@@ -111,16 +121,17 @@ int ProcessExecution( Process turnProcess )
 
     else if (pid == 0) // running process
     {
-        printf("remaining time: %d\n", *remainingTime);
- sendMsg(msgq_id_PrcSch, turnProcess , getpid());
+        printf("remaining time: %d\n", addedProcess.runtime);
+ //sendMsg(msgq_id_PrcSch, turnProcess , getpid());
    printf("created chile with id : %d\n", getpid());
-        char *runCommand = (char *)malloc(18 * sizeof(char));
-        char buffer[10];
-        sprintf(buffer, "%d", *remainingTime);
-        strcpy(runCommand, "./process.out ");
-        strcat(runCommand, buffer);
-      // execl()
-        exit(0);
+       
+      char* id_string;
+      char* remaintime_string;
+     my_itoa(turnProcess.id , id_string);
+     my_itoa(turnProcess.runtime , remaintime_string);
+    //  snprintf() 
+       execl("./process.out","./process.out",NULL);
+       // exit(0);
     }
     return pid; // return pid to know which child process will be terminated due to an algorithm
 }
@@ -240,7 +251,7 @@ void FCFS()
     {
         checkRecievedProcess();
     // startProcess(addedProcess);
-    ProcessExecution( addedProcess);
+       ProcessExecution( addedProcess);
     }
 }
 
@@ -263,7 +274,7 @@ void HPF()
         if (HPF_Queue_size != -1) // check from the seocnd time
             Check_finshed_processes(message.process.id);
 
-        checkRecievedProcess();
+          checkRecievedProcess();
           printf("after reciev: \n");
         // no processes currently to schedule
        
@@ -286,7 +297,7 @@ void HPF()
             PCB_LIST[message.process.id].remainingtime = message.process.runtime - getClk() - PCB_LIST[message.process.id].startingTime;
             PCB_LIST[message.process.id].stopped_time = getClk();
             //TODO:send remaining time to process.c
-            sharedMemory_func(0, PCB_LIST[message.process.id].remainingtime);
+           // sharedMemory_func(0, PCB_LIST[message.process.id].remainingtime);
 
             // inform process file to stop the process
             stopProcess(message.process.id);
@@ -323,7 +334,7 @@ void HPF()
             PCB_LIST[message.process.id].startingTime = getClk();
             PCB_LIST[message.process.id].remainingtime = message.process.runtime;
             // write to the prcoess.c that remaining time is the whole run time
-            sharedMemory_func(1, PCB_LIST[message.process.id].runtime);
+          //  sharedMemory_func(1, PCB_LIST[message.process.id].runtime);
             fprintf(pFile, "At time %d\t process %d\t started arr %d\t total %d\t remain %d\t wait %d\n",
                     getClk(), message.process.id, message.process.arrival_time, message.process.runtime, message.process.runtime, 0);
             // send the process parameters to process file
@@ -421,4 +432,5 @@ void RR(int quantum){
                 enqueue(Ready_queue,process_turn);
                 Ready_NUm_processes++; 
          }
+}
 }
