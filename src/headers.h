@@ -258,6 +258,7 @@ Process dequeue(Queue *myqueue)
 //     }
 
 ////------------- priority Queue -------------////
+////------------- priority Queue -------------////
 struct item
 {
     Process myProcess;
@@ -275,7 +276,8 @@ void enqueue_priority(Process process, int priority)
 {
     // Increase the size
     HPF_Queue_size++;
-
+   printf("hhhhhhhhhhhhhhhhhhhhh\n");
+   printf(" size %d \n" , HPF_Queue_size);
     // Insert the element
     HPF_Queue[HPF_Queue_size].myProcess = process;
     HPF_Queue[HPF_Queue_size].priority = priority;
@@ -285,7 +287,7 @@ void enqueue_priority(Process process, int priority)
 int peek_priority()
 {
     //NOTE:**** el highest priority the least value of priority
-    int highestPriority = 2147483648; //INT_MAX
+    int highestPriority = 100; //INT_MAX
     int ind = -1;
 
     // Check for the element with highest priority
@@ -294,15 +296,22 @@ int peek_priority()
         // If priority is same choose
         // the element with the
         // highest value
+        //  printf(" peeek size %d \n" , HPF_Queue_size);
+      //     printf("********* %d %d \n", highestPriority,HPF_Queue[i].priority);
         if (highestPriority == HPF_Queue[i].priority && ind > -1)
         {
+           // printf("1- %d \n", HPF_Queue[i].priority);
             highestPriority = HPF_Queue[i].priority;
             ind = i;
+            //printf("1-  after %d %d \n", highestPriority, ind);
         }
+
         else if (highestPriority >= HPF_Queue[i].priority)
         {
+           //  printf("2- %d \n", HPF_Queue[i].priority);
             highestPriority = HPF_Queue[i].priority;
             ind = i;
+             //printf("2-  after %d %d \n", highestPriority, ind);
         }
     }
 
@@ -311,20 +320,27 @@ int peek_priority()
 }
 
 // Function to remove the element with the highest priority
-void dequeue_priority()
+Process dequeue_priority()
 {
+     struct  Process running_pro;
     // Find the position of the element
     // with highest priority
     int ind = peek_priority();
-
+     running_pro = HPF_Queue[ind].myProcess;
+    //   printf("dequeueeeeeeeeeeeeeeeeeeeeeeeeeeeeeee %d \n", HPF_Queue[ind].myProcess.id);
+// printf("dequeueeeeeeeeeeeeeeeeeeeeeeeeeeeeeee %d \n" , ind);
+  // printf( "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@e %d\t process %d\t stopped arr %d\t total %d\t \n",
+            //        getClk(),HPF_Queue[ind].myProcess.id, HPF_Queue[ind].myProcess.arrival_time,HPF_Queue[ind].myProcess.runtime);
     // Shift the element one index before
     // from the postion of the element
     // with highest priortity is found
-    for (int i = ind; i < HPF_Queue_size; i++)
+    for (int i = ind; i  <=HPF_Queue_size; i++)
     {
         HPF_Queue[i] = HPF_Queue[i + 1];
     }
     // Decrease the size of the
     // priority queue by one
     HPF_Queue_size--;
+  //  printf("dequeueeeeeeeeeeeeeeeeeeeeeeeeeeeeeee %d \n", HPF_Queue[ind].myProcess.id);
+    return running_pro;
 }
