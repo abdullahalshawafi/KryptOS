@@ -27,7 +27,8 @@ Message process_msg;
 
 // variables used to write in the files
 FILE *prefFile, *logFile;
-float CPU_U, WT, WTA, WTA_total, WT_total;
+float CPU_U, WTA, WTA_total;
+int WT, WT_total;
 
 // need to compute them
 int sys_start_time;
@@ -60,12 +61,6 @@ int main(int argc, char *argv[])
     // msg queue to talk to process generator
     msgq_id_GenSch = initMsgq(msgq_genSchKey);
 
-    // msg queue to talk to process file
-    msgq_id_PrcSch = initMsgq(msgq_prcSchKey);
-
-    // create shared memory to write /read   remaining time / execuation time in it =>> Process.c
-    remainingTime = (int *)initShm(shmKey, &shmid);
-
     // create shared memory to detect the finished state of the scheduler
     finished = (int *)initShm(finishedKey, &shmFinishedId);
 
@@ -77,7 +72,7 @@ int main(int argc, char *argv[])
     initialize(Ready_queue);
 
     logFile = fopen("Scheduler.log", "w");
-    fprintf(logFile, "#At time x process y started arr w total z remain y wait k\n");
+    fprintf(logFile, "#At time x process y state arr w total z remain y wait k\n");
 
     switch (schedulingAlgorithm)
     {
@@ -109,7 +104,7 @@ int main(int argc, char *argv[])
 
     //TODO: upon termination release the clock resources. ?????????????
 
-    shmctl(shmid, IPC_RMID, NULL);
+    shmctl(shm_remainingTime_ID, IPC_RMID, NULL);
     destroyClk(true);
     *finished = 1;
 }
@@ -117,7 +112,7 @@ int main(int argc, char *argv[])
 void clearResources(int signum)
 {
     //TODO Clears all resources in case of interruption
-    shmctl(shmid, IPC_RMID, NULL);
+    shmctl(shm_remainingTime_ID, IPC_RMID, NULL);
     exit(0);
 }
 
@@ -129,7 +124,10 @@ int startProcess(Process turnProcess)
         perror("error in fork");
 
     else if (pid == 0) // running process
-        execl("./process.out", NULL);
+    {
+        execl("./process.out", "./process.out", NULL);
+        exit(0);
+    }
 
     fprintf(logFile, "At time %d process %d started arr %d total %d remain %d wait %d\n",
             getClk(),
@@ -213,43 +211,67 @@ void sharedMemory_func(int RW, int remainTime)
     shmdt(remainingTime);
 }
 
-void Check_finshed_processes(int ID)
+void finishProcess(Process runningProcess)
+{
+    printf("finishing process: %d\n", runningProcess.id);
+
+    WTA = (getClk() - runningProcess.arrival_time) * 1.0 / runningProcess.runtime;
+    WTA_total += WTA;
+
+    WT = getClk() - runningProcess.arrival_time - runningProcess.runtime;
+    WT_total += WT;
+
+    fprintf(logFile, "At time %d process %d finished arr %d total %d remain 0 wait %d TA %d WTA %.2f\n",
+            getClk(),
+            runningProcess.id,
+            runningProcess.arrival_time,
+            runningProcess.runtime,
+            WT,
+            getClk() - runningProcess.arrival_time,
+            WTA);
+
+    *shm_remainingTime = -1;
+}
+
+void finshed_processe(int ID)
 {
     printf("in finish: \n");
-    if (PCB_LIST[ID].remainingtime == 0)
-    {
-        printf("process %d finished: \n", ID);
-        // write remaining time = 0 to process.c
-        // sharedMemory_func(0, *shm_remainingTime);
 
-        // read the real execution time from process.c
-        //  sharedMemory_func(1, 0);
-        // TA = finish - arr (total life time)
-        WTA = (getClk() - PCB_LIST[ID].arrival_time) / PCB_LIST[ID].runtime;
-        WTA_total += WTA;
-        // finsh getclk -  arr - run
-        WT = getClk() - PCB_LIST[ID].arrival_time - PCB_LIST[ID].runtime;
-        WT_total += WT;
+    printf("process %d finished: \n", ID);
 
-        fprintf(prefFile, "At time %d\t process %d\t finished arr %d\t total %d\t remain %d\t wait\n",
-                getClk(), PCB_LIST[ID].id, PCB_LIST[ID].arrival_time, PCB_LIST[ID].runtime,
-                0, PCB_LIST[ID].waiting_time);
+    // TA = finish - arr (total life time)
+    WTA = (getClk() - PCB_LIST[ID].arrival_time) / PCB_LIST[ID].runtime;
+    WTA_total += WTA;
+    // finsh getclk -  arr - run
+    WT = getClk() - PCB_LIST[ID].arrival_time - PCB_LIST[ID].runtime;
+    WT_total += WT;
 
-        //TODO:free (PCB_LIST[id]);
-    }
+    printf("At time %d\t process %d\t finished arr %d\t total %d\t remain %d\t wait %d\n",
+           getClk(), PCB_LIST[ID].id, PCB_LIST[ID].arrival_time, PCB_LIST[ID].runtime,
+           0, PCB_LIST[ID].waiting_time);
+
+    //TODO:free (PCB_LIST[id]);
 }
 
 void FCFS()
 {
     printf("In FCFS\n");
+    Process runningProcess;
+    *shm_remainingTime = -1;
     myUsedDS = DS_Queue; // I'll use a normal queue
 
     while (Ready_NUm_processes < processesNum)
     {
-        // if (*shm_remainingTime == 0)
-
         checkRecievedProcess();
-        startProcess(addedProcess);
+
+        if (*shm_remainingTime == 0)
+            finishProcess(runningProcess);
+        else if (!isEmpty(Ready_queue) && *shm_remainingTime == -1)
+        {
+            dequeue(Ready_queue, &runningProcess);
+            *shm_remainingTime = runningProcess.runtime + 1;
+            runningProcess.process_id = startProcess(runningProcess);
+        }
     }
 }
 
@@ -284,7 +306,7 @@ void RR(int quantum)
 
         if (*shm_remainingTime == 0)
         {
-            Check_finshed_processes(runningProcess.id);
+            finshed_processe(runningProcess.id);
             quantum_check = quantum;
         }
 
@@ -346,7 +368,7 @@ void RR(int quantum)
                 }
                 else
                 {
-                    process_turn = dequeue(Ready_queue);
+                    dequeue(Ready_queue, &process_turn);
                     runningProcess = process_turn;
                     turn = runningProcess.id;
                 }

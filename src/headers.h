@@ -148,7 +148,7 @@ void *initShm(char key, int *id)
     }
 
     void *addr = shmat(shmId, (void *)0, 0);
-    if (shmaddr == -1)
+    if (*((int *)shmaddr) == -1)
     {
         perror("Error in attaching shared memory");
         exit(-1);
@@ -232,12 +232,14 @@ void enqueue(Queue *myqueue, Process new_process)
     }
 }
 
-Process dequeue(Queue *myqueue)
+void dequeue(Queue *myqueue, Process *dequeuedProcess)
 {
     if (myqueue->count == 0)
         return;
+
     Node *temp = myqueue->front;
-    Process deleted = temp->myprocess;
+    *dequeuedProcess = temp->myprocess;
+
     if (myqueue->front == myqueue->rear)
         myqueue->front = myqueue->rear = NULL;
     else
@@ -246,16 +248,15 @@ Process dequeue(Queue *myqueue)
         temp->next = NULL;
         free(temp);
     }
+
     Queue_length--;
     myqueue->count--;
-
-    return deleted;
 }
 
-// bool isEmpty(Queue *q)
-//     {
-//         return (q->length ==0);
-//     }
+bool isEmpty(Queue *q)
+{
+    return (q->count == 0);
+}
 
 ////------------- priority Queue -------------////
 struct item

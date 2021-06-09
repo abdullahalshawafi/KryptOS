@@ -1,10 +1,5 @@
 #include "headers.h"
 
-// We store the remaining time to decrement it if the clock value
-// increased and the process was running
-int remainingtime, startingTime, pid, lastClk, runtime, arrivaltime;
-int execution_time;
-
 int main(int agrc, char *argv[])
 {
     // Initialize clock and set remaining time

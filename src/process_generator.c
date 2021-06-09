@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
         perror("error in fork");
 
     else if (clk_processId == 0)
-        execl("./clk.out", NULL);
+        execl("./clk.out", "./clk.out", NULL);
 
     int scheduler_processId = fork();
     if (scheduler_processId == -1)
