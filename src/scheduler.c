@@ -54,8 +54,6 @@ int main(int argc, char *argv[])
     //pFile = fopen("Scheduler.log", "w");
     //fclose(pFile); // close the file emta msh 3arfa rabna ysahl
 
-    ///----------------------------------- Message queues initializations------------------------
-
     // msg queue to talk to process generator
     msgq_id_GenSch = initMsgq(msgq_genSchKey);
 
@@ -171,7 +169,7 @@ void checkRecievedProcess()
         printf("HPF  id: %d\n", HPF_Queue[peek_priority()].myProcess.id);
     }
 
-    printf("received process id: %d\n", added + 1);
+    printf("received process id: %d\n", added);
     PCB_LIST[added].arrival_time = addedProcess.arrival_time;
     PCB_LIST[added].priority = addedProcess.priority;
     //PCB_LIST[added].process_id=addedProcess.process_id;
@@ -248,14 +246,14 @@ void FCFS()
 {
     printf("In FCFS\n");
     myUsedDS = DS_Queue; // I'll use a normal queue
+    int wt = 0;
     while (Ready_NUm_processes < processesNum)
     {
         checkRecievedProcess();
-        printf("%d\n", Ready_NUm_processes);
-        int wt = PCB_LIST[Ready_NUm_processes - 1].runtime + PCB_LIST[Ready_NUm_processes - 1].waiting_time;
+        startProcess(addedProcess);
+        wt += PCB_LIST[Ready_NUm_processes - 1].runtime + PCB_LIST[Ready_NUm_processes - 1].waiting_time;
         fprintf(logFile, "At time %d process %d started arr %d total %d remain %d wait %d\n",
                 getClk(), addedProcess.id, addedProcess.arrival_time, addedProcess.runtime, addedProcess.runtime, wt);
-        // startProcess(addedProcess);
     }
 }
 
