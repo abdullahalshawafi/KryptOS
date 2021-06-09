@@ -19,14 +19,14 @@ typedef short bool;
 #define SHKEY 300
 
 //===============================//
-// don't mess with this variable
-int *shmaddr, *finished,*shm_remainingTime;
+// don't mess with these variables
+int *shmaddr, *finished, *shm_remainingTime;
 //////////////////////////////////
 char msgq_genSchKey = 'A';
 char msgq_prcSchKey = 'B';
 char shmKey = 'C';
 char finishedKey = 'F';
-char remainKey='R';
+char remainKey = 'R';
 //===============================//
 
 // Each process have a state of only two state running or blocked
@@ -174,7 +174,7 @@ void destroyClk(bool terminateAll)
 
 ////------------- general variables declerations -------------////
 int schedulingAlgorithm, quantum = -1;
-int msgq_id_GenSch, shmFinishedId,shm_remainingTime_ID;
+int msgq_id_GenSch, shmFinishedId, shm_remainingTime_ID;
 int rec_process;
 int processesNum = 0; // no.of the processes read from the input file
 //int Current_processesNum = 0; // no. of the processes remaining (not finished)
@@ -208,7 +208,7 @@ void initialize(Queue *queue)
 {
     queue->front = NULL;
     queue->rear = NULL;
-    queue->count=0;
+    queue->count = 0;
 }
 
 void enqueue(Queue *myqueue, Process new_process)
@@ -216,7 +216,7 @@ void enqueue(Queue *myqueue, Process new_process)
     Node *newnode = malloc(sizeof(Node));
     newnode->myprocess = new_process;
     newnode->next = NULL;
-    if (myqueue->count==0)
+    if (myqueue->count == 0)
     {
         myqueue->front = newnode;
         myqueue->rear = myqueue->front;
@@ -234,8 +234,8 @@ void enqueue(Queue *myqueue, Process new_process)
 
 Process dequeue(Queue *myqueue)
 {
-    if (myqueue->count==0)
-        return ;
+    if (myqueue->count == 0)
+        return;
     Node *temp = myqueue->front;
     Process deleted = temp->myprocess;
     if (myqueue->front == myqueue->rear)
@@ -247,7 +247,7 @@ Process dequeue(Queue *myqueue)
         free(temp);
     }
     Queue_length--;
-     myqueue->count--;
+    myqueue->count--;
 
     return deleted;
 }

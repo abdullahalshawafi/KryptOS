@@ -76,6 +76,7 @@ int main(int argc, char *argv[])
     msgq_id_GenSch = initMsgq(msgq_genSchKey);
     finished = (int *)initShm(finishedKey, &shmFinishedId);
     *finished = 0;
+
     // 6. Send the information to the scheduler at the appropriate time.
 
     // loop untill all the processes in the file are sent to scheduler
