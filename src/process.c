@@ -9,11 +9,11 @@ int main(int agrc, char *argv[])
 {
     // Initialize clock and set remaining time and startTime
     initClk();
-    //remainingtime = atoi(argv[1]);
+    remainingtime = atoi(argv[1]);
     startingTime = lastClk = getClk();
-    //int id = atoi(argv[2]);
+    int id = atoi(argv[2]);
       printf("hello i am in process.c with is %d\n", getpid());
-      //printf("i am process with is  %d  my remaining time %d\n", id, remainingtime);
+      printf("i am process with is  %d  my remaining time %d\n", id, remainingtime);
 
     // Set the current state to be a running proccess
     enum STATE currentState = running;

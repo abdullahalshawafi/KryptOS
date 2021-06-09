@@ -103,12 +103,9 @@ void clearResources(int signum)
     shmctl(shmid, IPC_RMID, NULL);
     exit(0);
 }
-char *my_itoa(int num, char *str)
+char* my_itoa(int num, char *str)
 {
-        if(str == NULL)
-        {
-                return NULL;
-        }
+        
         sprintf(str, "%d", num);
         return str;
 }
@@ -125,12 +122,14 @@ int ProcessExecution( Process turnProcess )
  //sendMsg(msgq_id_PrcSch, turnProcess , getpid());
    printf("created chile with id : %d\n", getpid());
        
-      char* id_string;
-      char* remaintime_string;
-     my_itoa(turnProcess.id , id_string);
-     my_itoa(turnProcess.runtime , remaintime_string);
+      char id_string[20];
+      char  remaintime_string[20];
+     
+      sprintf( id_string, "%d",turnProcess.id );
+      sprintf( remaintime_string, "%d",turnProcess.runtime);
+      execl("./process.out","./process.out",remaintime_string, id_string,NULL);
     //  snprintf() 
-       execl("./process.out","./process.out",NULL);
+      
        // exit(0);
     }
     return pid; // return pid to know which child process will be terminated due to an algorithm
