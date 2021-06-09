@@ -83,23 +83,19 @@ int main(int argc, char *argv[])
     msgq_id_GenSch = initMsgq(msgq_genSchKey);
     // 6. Send the information to the scheduler at the appropriate time.
 
-    int i = 0, sen_val;
-
+    Message message;
     // loop untill all the processes in the file are sent to scheduler
     while (processesNum_sent_toSCH < processesNum)
     {
         if (processes[processesNum_sent_toSCH].arrival_time == getClk())
         {
             printf("send process: %d\n", processes[processesNum_sent_toSCH].id);
-            sendMsg(processes[processesNum_sent_toSCH], msgq_id_GenSch);
+            message.process = processes[processesNum_sent_toSCH];
+            if (msgsnd(msgq_id_GenSch, &message, sizeof(message.process), !IPC_NOWAIT) == -1)
+                perror("Error in sending the process");
+            // sendMsg(msgq_id_GenSch, processes[processesNum_sent_toSCH]);
             processesNum_sent_toSCH++;
         }
-
-        // we may reach end of the array but still there are some processes not sent to scheduler yet
-        // if (i == processesNum)
-        //     i = 0;
-        // else
-        //     i++;
     }
 
     // 7. Clear clock resources

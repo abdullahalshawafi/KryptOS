@@ -29,7 +29,7 @@ int main(int agrc, char *argv[])
     Message message;
     int recValue = msgrcv(msgq_id_PrcSch, &message, sizeof(message.process), pid, IPC_NOWAIT);
     if (recValue == -1)
-        perror("Process.c :Error in recieveing the process: ");
+        perror("Process.c: Error in recieveing the process: ");
 
     // give the prcoess its parameters (sent from scheduler)
     startingTime = getClk();

@@ -114,13 +114,22 @@ int initMsgq(int key)
     return msgqId;
 }
 
-void sendMsg(Process process, int msgqId)
+void sendMsg(int msgqId, Process process)
 {
     Message message;
+    message.mtype = getpid();
     message.process = process;
-    int send_val;
-    if ((send_val = msgsnd(msgqId, &message, sizeof(message.process), !IPC_NOWAIT)) == -1)
+    if (msgsnd(msgqId, &message, sizeof(message.process), !IPC_NOWAIT) == -1)
         perror("Error in sending the process");
+}
+
+Process receiveMsg(int msgqId)
+{
+    Message message;
+    if (msgrcv(msgqId, &message, sizeof(message.process), 0, !IPC_NOWAIT) == -1)
+        perror("Error in receiving the process");
+
+    return message.process;
 }
 
 void *initShm(char key, int *id)
@@ -131,7 +140,7 @@ void *initShm(char key, int *id)
 
     if (shmId == -1)
     {
-        perror("Error in creating of message queue");
+        perror("Error in creating of shared memory");
         exit(-1);
     }
 
@@ -165,8 +174,8 @@ int schedulingAlgorithm, quantum = -1;
 int msgq_id_GenSch;
 int rec_process;
 int processesNum = 0; // no.of the processes read from the input file
-//int Current_processesNum = 0; // no.of the processes remaining (not finished)
-int processesNum_sent_toSCH = 0; //no.of the processes sent to the scheduler
+//int Current_processesNum = 0; // no. of the processes remaining (not finished)
+int processesNum_sent_toSCH = 0; //no. of the processes sent to the scheduler
 
 // dol msh 3arfa les hyt7sbo fen w ezay but we need them
 int actual_processing_time; // total of all the processes to compute CPU utilization

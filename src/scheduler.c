@@ -36,8 +36,8 @@ int myUsedDS;
 ///----------------------------------------------- MAIN --------------------------------------------------------
 int main(int argc, char *argv[])
 {
-    signal(SIGINT, clearResources);
     initClk();
+    signal(SIGINT, clearResources);
     sys_start_time = getClk();
     processesNum = atoi(argv[1]);
     schedulingAlgorithm = atoi(argv[2]);
@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
         quantum = atoi(argv[3]);
 
     PCB_LIST = (PCB *)malloc(processesNum * sizeof(PCB));
-    pFile = fopen("Scheduler.log", "w");
+    //pFile = fopen("Scheduler.log", "w");
     //fclose(pFile); // close the file emta msh 3arfa rabna ysahl
 
     ///----------------------------------- Message queues initializations------------------------
@@ -81,23 +81,24 @@ int main(int argc, char *argv[])
         break;
     }
 
-    fclose(pFile); // close the file emta msh 3arfa rabna ysahl
+    // fclose(pFile); // close the file emta msh 3arfa rabna ysahl
 
-    pFile = fopen("Scheduler.pref", "w");
-    CPU_U = (getClk() - sys_start_time) / total_exec_time;
-    fprintf(pFile, "A CPU utilization = %f\t \n", CPU_U);
-    fprintf(pFile, "Avg WTA = %f\t \n", WT_total / processesNum);
-    fprintf(pFile, "Avg Waiting = %f\t \n", WT_total / processesNum);
-    fclose(pFile);
+    // pFile = fopen("Scheduler.pref", "w");
+    // CPU_U = (getClk() - sys_start_time) / total_exec_time;
+    // fprintf(pFile, "A CPU utilization = %f\t \n", CPU_U);
+    // fprintf(pFile, "Avg WTA = %f\t \n", WT_total / processesNum);
+    // fprintf(pFile, "Avg Waiting = %f\t \n", WT_total / processesNum);
+    // fclose(pFile);
     //TODO: upon termination release the clock resources. ?????????????
 
+    shmctl(shmid, IPC_RMID, NULL);
     destroyClk(true);
 }
 
 void clearResources(int signum)
 {
     //TODO Clears all resources in case of interruption
-    msgctl(msgq_id_GenSch, IPC_RMID, (struct msqid_ds *)0);
+    shmctl(shmid, IPC_RMID, NULL);
     exit(0);
 }
 
@@ -116,9 +117,7 @@ int ProcessExecution()
         sprintf(buffer, "%d", *remainingTime);
         strcpy(runCommand, "./process.out ");
         strcat(runCommand, buffer);
-        printf("%s", buffer);
-        // system(runCommand);
-        // system("./process.out");
+        system(runCommand);
         exit(0);
     }
 
@@ -132,34 +131,22 @@ void checkRecievedProcess()
     int added;
 
     // from process generator
-    rec_process = msgrcv(msgq_id_GenSch, &process_msg, sizeof(process_msg.process), 0, !IPC_NOWAIT);
-
-    if (rec_process == -1)
-    {
-        perror("Error in receiving process");
-        return;
-    }
-
-    addedProcess = process_msg.process; // make my process equals to the process coming from the msg queue
-
+    addedProcess = receiveMsg(msgq_id_GenSch);
     added = addedProcess.id - 1; ////// remove -1
 
     if (myUsedDS == DS_Queue)
-    {
         enqueue(Ready_queue, addedProcess);
-    }
     else if (myUsedDS = DS_PrioirtyQ)
-    {
         enqueue_priority(addedProcess, addedProcess.priority);
-    }
 
-    printf("added: %d\n", added + 1);
+    printf("received process: %d\n", added + 1);
     PCB_LIST[added].arrival_time = addedProcess.arrival_time;
     PCB_LIST[added].priority = addedProcess.priority;
-    //    PCB_LIST[added].process_id=addedProcess.process_id;
+    //PCB_LIST[added].process_id=addedProcess.process_id;
     PCB_LIST[added].id = addedProcess.id;
     PCB_LIST[added].runtime = addedProcess.runtime;
     Ready_NUm_processes++;
+    printf("recieved processes: %d\n", Ready_NUm_processes);
 }
 
 void stopProcess(int turn)
@@ -179,15 +166,15 @@ void resumeProcess(int turn)
 int startProcess(Process turnProcess)
 {
     printf("start process: %d\n", turnProcess.id);
-    sendMsg(turnProcess, msgq_id_PrcSch);
-
+    sendMsg(msgq_id_PrcSch, turnProcess);
+    *remainingTime = turnProcess.runtime;
     // run process.c
     return (ProcessExecution());
 }
 
 void sharedMemory_func(int RW, int remainTime)
 {
-    if (atoi(remainingTime) == -1)
+    if (*remainingTime == -1)
     {
         perror("Scheduler: Error in attach in writer/reader");
         exit(-1);
@@ -236,10 +223,10 @@ void FCFS()
 {
     printf("In FCFS\n");
     myUsedDS = DS_Queue; // I'll use a normal queue
-    while (Ready_NUm_processes <= processesNum)
+    while (Ready_NUm_processes <= processesNum - 1)
     {
         checkRecievedProcess();
-        startProcess(addedProcess);
+        // startProcess(addedProcess);
     }
 }
 
