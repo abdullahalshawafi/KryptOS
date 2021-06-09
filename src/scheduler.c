@@ -261,7 +261,7 @@ void HPF()
     int is_running=0;
     // first time to recieve ?????????
     //loop till the queue is empty
-    while (  1) // or first time
+    while ( num_of_proceesse_recieved < processesNum ) // or first time
     {
          printf("REady Proccesa %d \n" ,num_of_proceesse_recieved);
           checkRecievedProcess();
