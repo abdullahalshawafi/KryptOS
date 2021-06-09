@@ -17,7 +17,7 @@ int main(int agrc, char *argv[])
             lastClk = getClk();
         }
     }
-
+    printf(" process with id  %d terminated ", getpid());
     destroyClk(false);
 
     return 0;
