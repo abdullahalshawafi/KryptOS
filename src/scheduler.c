@@ -102,7 +102,7 @@ void clearResources(int signum)
     exit(0);
 }
 
-int ProcessExecution()
+int ProcessExecution( Process turnProcess )
 {
     int pid = fork();
 
@@ -112,15 +112,16 @@ int ProcessExecution()
     else if (pid == 0) // running process
     {
         printf("remaining time: %d\n", *remainingTime);
+ sendMsg(msgq_id_PrcSch, turnProcess , getpid());
+   printf("created chile with id : %d\n", getpid());
         char *runCommand = (char *)malloc(18 * sizeof(char));
         char buffer[10];
         sprintf(buffer, "%d", *remainingTime);
         strcpy(runCommand, "./process.out ");
         strcat(runCommand, buffer);
-        system(runCommand);
+      // execl()
         exit(0);
     }
-
     return pid; // return pid to know which child process will be terminated due to an algorithm
 }
 
@@ -135,18 +136,28 @@ void checkRecievedProcess()
     added = addedProcess.id - 1; ////// remove -1
 
     if (myUsedDS == DS_Queue)
-        enqueue(Ready_queue, addedProcess);
-    else if (myUsedDS = DS_PrioirtyQ)
-        enqueue_priority(addedProcess, addedProcess.priority);
+    {
 
-    printf("received process: %d\n", added + 1);
+ enqueue(Ready_queue, addedProcess);
+    }
+       
+    else if (myUsedDS = DS_PrioirtyQ)
+    {
+ enqueue_priority(addedProcess, addedProcess.priority);
+ printf("priority enqueue id: %d\n",addedProcess.id);
+ printf("HPF  id: %d\n",HPF_Queue[peek_priority()].myProcess.id);
+
+    }
+       
+
+    printf("received process id: %d\n", added + 1);
     PCB_LIST[added].arrival_time = addedProcess.arrival_time;
     PCB_LIST[added].priority = addedProcess.priority;
     //PCB_LIST[added].process_id=addedProcess.process_id;
     PCB_LIST[added].id = addedProcess.id;
     PCB_LIST[added].runtime = addedProcess.runtime;
     Ready_NUm_processes++;
-    printf("recieved processes: %d\n", Ready_NUm_processes);
+    printf("number of recieved processes: %d\n", Ready_NUm_processes);
 }
 
 void stopProcess(int turn)
@@ -166,10 +177,10 @@ void resumeProcess(int turn)
 int startProcess(Process turnProcess)
 {
     printf("start process: %d\n", turnProcess.id);
-    sendMsg(msgq_id_PrcSch, turnProcess);
-    *remainingTime = turnProcess.runtime;
+    //sendMsg(msgq_id_PrcSch, turnProcess);
+  //  *remainingTime = turnProcess.runtime;
     // run process.c
-    return (ProcessExecution());
+   // return (ProcessExecution());
 }
 
 void sharedMemory_func(int RW, int remainTime)
@@ -197,8 +208,10 @@ void sharedMemory_func(int RW, int remainTime)
 
 void Check_finshed_processes(int ID)
 {
+    printf("in finish: \n");
     if (PCB_LIST[ID].remainingtime == 0)
     {
+        printf("process %d finished: \n", ID);
         // write remaining time = 0 to process.c
         sharedMemory_func(0, PCB_LIST[ID].remainingtime);
 
@@ -226,7 +239,8 @@ void FCFS()
     while (Ready_NUm_processes <= processesNum - 1)
     {
         checkRecievedProcess();
-        // startProcess(addedProcess);
+    // startProcess(addedProcess);
+    ProcessExecution( addedProcess);
     }
 }
 
@@ -235,7 +249,7 @@ void SJF() {}
 void HPF()
 {
 
-    myUsedDS = DS_PrioirtyQ; /// I'll use Priority queue
+    myUsedDS = 2; /// I'll use Priority queue
 
     int current_turn = 0;
     int current_process_index = -1;
@@ -250,19 +264,23 @@ void HPF()
             Check_finshed_processes(message.process.id);
 
         checkRecievedProcess();
-
+          printf("after reciev: \n");
         // no processes currently to schedule
-        if (HPF_Queue_size == -1)
-            continue;
-
+       
         // get process with highest priority make it running and send it to the process
         current_process_index = current_turn;
         current_turn = peek_priority();
+         printf("current index: %d  \n", current_process_index);
+           printf("current turn: %d  \n", current_turn);
+        
 
         // check if the added process has higher priority that the current running process
         // TODO: need handle first time
         if (current_process_index != current_turn) // awl mara???
         {
+                    printf("in stopping block\n");
+            
+
             // save context switch
             // remain = total run - time stopped - started
             PCB_LIST[message.process.id].remainingtime = message.process.runtime - getClk() - PCB_LIST[message.process.id].startingTime;
@@ -285,6 +303,8 @@ void HPF()
         //if process with the next turn is waiting in the ready queue:
         if (PCB_LIST[HPF_Queue[current_turn].myProcess.id].state == waiting)
         {
+            printf("in resumming block\n");
+            
             resumeProcess((HPF_Queue[current_turn].myProcess.id));
 
             PCB_LIST[HPF_Queue[current_turn].myProcess.id].waiting_time += getClk() - PCB_LIST[HPF_Queue[current_turn].myProcess.id].stopped_time;
@@ -297,6 +317,8 @@ void HPF()
         // first time to run
         else
         {
+            printf("in starting block\n");
+            
             message.process = HPF_Queue[current_turn].myProcess;
             PCB_LIST[message.process.id].startingTime = getClk();
             PCB_LIST[message.process.id].remainingtime = message.process.runtime;

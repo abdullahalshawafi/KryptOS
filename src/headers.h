@@ -114,10 +114,10 @@ int initMsgq(int key)
     return msgqId;
 }
 
-void sendMsg(int msgqId, Process process)
+void sendMsg(int msgqId, Process process , int processs_id)
 {
     Message message;
-    message.mtype = getpid();
+    message.mtype = processs_id;
     message.process = process;
     if (msgsnd(msgqId, &message, sizeof(message.process), !IPC_NOWAIT) == -1)
         perror("Error in sending the process");

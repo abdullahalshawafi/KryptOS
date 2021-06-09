@@ -11,6 +11,7 @@ int main(int agrc, char *argv[])
     initClk();
     remainingtime = atoi(argv[1]);
     startingTime = lastClk = getClk();
+      printf("hello i am in process.c with is %d\n", getpid());
 
     // Set the current state to be a running proccess
     enum STATE currentState = running;
@@ -27,7 +28,7 @@ int main(int agrc, char *argv[])
 
     // recieve which process's PCB will be running
     Message message;
-    int recValue = msgrcv(msgq_id_PrcSch, &message, sizeof(message.process), pid, IPC_NOWAIT);
+    int recValue = msgrcv(msgq_id_PrcSch, &message, sizeof(message.process), 0, IPC_NOWAIT);
     if (recValue == -1)
         perror("Process.c: Error in recieveing the process: ");
 
